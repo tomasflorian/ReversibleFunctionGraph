@@ -25,6 +25,18 @@ g.def("last", s => s.charAt(s.length - 1));
 g.def("sort", s => s.split("").sort().join(""));            // anagram signature
 g.def("vowels", s => String((s.match(/[aeiou]/g) ?? []).length));
 g.def("hasLetter", (s, c) => String(s.includes(c)));       // multi-arg (UFCS)
+g.def("parseRecordType", s=> s.split(":")[0])
+g.def("parseRecordValue", s => s.split(":")[1])
+g.def("parseIPFromIPWithSubnet", s=> s.split("/")[0]);
+g.def("parseSubnetFromIPWithSubnet", s => s.split("/")[1]);
+g.def("lastOctetFromIP", s => s.split(".")[3]);
+
+g.node("IP:192.168.1.3/24").apply("parseRecordType");
+g.node("IP:192.168.1.3/24").apply("parseRecordValue").apply("parseIPFromIPWithSubnet").apply("lastOctetFromIP");
+g.node("IP:192.168.1.3/24").apply("parseRecordValue").apply("parseSubnetFromIPWithSubnet");
+
+
+
 
 // The anagram family — every word is 3 letters from {a,c,r,t}. Maximum overlap.
 const words = ["cat", "act", "arc", "car", "tar", "rat", "art"];

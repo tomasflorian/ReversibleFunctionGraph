@@ -132,6 +132,14 @@ class Graph {
     return created;
   }
 
+  // Graph-level apply: fn(args…), subject is arg 0 (same UFCS convention as
+  // Node.apply). This is what a function BODY calls to use another function —
+  // the inner call traces and memoizes like any other, and stays FLAT: it hangs
+  // off its own inputs as a sibling, never wired to the outer call.
+  apply(fn: string, ...args: string[]): Node {
+    return this.node(args[0]).apply(fn, ...args.slice(1));
+  }
+
   // Run a registered function on its arguments.
   run(fn: string, args: string[]): string {
     const impl = this.fns.get(fn);
