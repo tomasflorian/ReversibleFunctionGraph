@@ -69,6 +69,8 @@
     tr.selrow th.rowh, tr.selrow td { background: #2a2216; } /* selected row tint */
     .cell { display: inline-block; padding: 2px 6px; border-radius: 5px; cursor: pointer; }
     .cell:hover { background: #222; }
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { color: #ddd; }
     .cell.hot { background: #dd6b20; color: #fff; } /* cells whose result == selection */
   </style>
 </head>
@@ -255,12 +257,39 @@
       }
       const pivot = buildPivot();
 
+      // sort state: which column, which direction. col null => subjects A→Z.
+      let sort = { col: null, dir: 1 };
+      const SUBJ = ""; // sentinel meaning "the subject (row-header) column"
+
+      // compare two result strings: numeric when both are numbers, else text.
+      function cmp(a, b) {
+        const na = +a, nb = +b;
+        const numeric = a !== "" && b !== "" && !isNaN(na) && !isNaN(nb);
+        return numeric ? na - nb : String(a).localeCompare(String(b));
+      }
+
+      function sortedSubjects() {
+        const { subjects, cell } = pivot;
+        if (sort.col === null) return subjects;                 // default A→Z
+        const keyOf = s => sort.col === SUBJ ? s : cell.get(s + SEP + sort.col)?.res;
+        return [...subjects].sort((a, b) => {
+          const ka = keyOf(a), kb = keyOf(b);
+          if (ka === undefined && kb === undefined) return 0;   // both blank
+          if (ka === undefined) return 1;                       // blanks sink...
+          if (kb === undefined) return -1;                      // ...to the bottom
+          return cmp(ka, kb) * sort.dir;
+        });
+      }
+
       function renderTable(selId) {
-        const { subjects, columns, cell } = pivot;
-        let h = `<div class="tablewrap"><table><thead><tr><th></th>`;
-        for (const c of columns) h += `<th>${esc(c)}</th>`;
+        const { columns, cell } = pivot;
+        const rows = sortedSubjects();
+        const arrow = c => sort.col === c ? (sort.dir > 0 ? " ▲" : " ▼") : "";
+        let h = `<div class="tablewrap"><table><thead><tr>` +
+          `<th class="rowh sortable" data-col="${SUBJ}">subject${arrow(SUBJ)}</th>`;
+        for (const c of columns) h += `<th class="sortable" data-col="${esc(c)}">${esc(c)}${arrow(c)}</th>`;
         h += `</tr></thead><tbody>`;
-        for (const s of subjects) {
+        for (const s of rows) {
           h += `<tr${s === selId ? ' class="selrow"' : ""}>` +
                `<th class="rowh"><span class="node" data-id="${esc(s)}">${dot(roleOf.get(s))}${esc(s)}</span></th>`;
           for (const c of columns) {
@@ -281,8 +310,16 @@
         viewEl.innerHTML = view === "table" ? renderTable(id) : renderTriples(id);
       }
 
-      // click any chip/cell (the call, the result, a subject) to walk there
+      // click a column header to sort; click any chip/cell to walk there
       viewEl.addEventListener("click", e => {
+        const th = e.target.closest("th.sortable");
+        if (th) {                                  // sort by this column (toggle dir)
+          const col = th.dataset.col;
+          if (sort.col === col) sort.dir *= -1;
+          else sort = { col, dir: 1 };
+          renderRight();
+          return;
+        }
         const el = e.target.closest("[data-id]");
         if (el) selectNode(el.getAttribute("data-id"));
       });
