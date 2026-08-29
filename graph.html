@@ -60,6 +60,8 @@
 
     /* pivot table (Shape A: subject × function) */
     .tablewrap { overflow: auto; }
+    .tbl-block { margin: 8px 0 22px; }
+    .tbl-block h3 { color: #dd6b20; }
     table { border-collapse: collapse; font-size: 12px; }
     th, td { border: 1px solid #2c2c2c; padding: 4px 8px; text-align: left; white-space: nowrap; }
     thead th { position: sticky; top: 0; background: #1a1a1a; color: #999;
@@ -93,6 +95,7 @@
       <div id="tabs">
         <button class="tab on" data-view="triples">triples</button>
         <button class="tab" data-view="table">table</button>
+        <button class="tab" data-view="tables">tables</button>
       </div>
       <div id="view"></div>
     </div>
@@ -303,11 +306,58 @@
         return h + `</tbody></table></div>`;
       }
 
-      // ---- dispatch: both tabs render the SAME selection ----
+      // TAB 3 — TABLES (one universal table, split into relations) ------------
+      // Group rows by their COLUMN-SIGNATURE (which columns they have a value in).
+      // Each group is a dense table — a relation recovered from the sparse pivot.
+      // (Blanks are treated as "no value here"; see the materialization caveat.)
+      function buildTables() {
+        const { subjects, columns, cell } = pivot;
+        const groups = new Map(); // sigKey -> { cols: string[], rows: string[] }
+        for (const s of subjects) {
+          const cols = columns.filter(c => cell.has(s + SEP + c)); // this row's signature
+          if (cols.length === 0) continue;
+          const key = cols.join(SEP);
+          if (!groups.has(key)) groups.set(key, { cols, rows: [] });
+          groups.get(key).rows.push(s);
+        }
+        // biggest tables first (most rows), then most columns
+        return [...groups.values()].sort((a, b) =>
+          b.rows.length - a.rows.length || b.cols.length - a.cols.length);
+      }
+
+      function renderTables(selId) {
+        const { cell } = pivot;
+        const groups = buildTables();
+        let h = `<div class="hint">${groups.length} table(s) — rows grouped by which columns they fill</div>`;
+        groups.forEach((grp, i) => {
+          h += `<div class="tbl-block"><h3>table ${i + 1} · ${grp.rows.length} row(s) · ` +
+               `[${grp.cols.map(esc).join(", ")}]</h3><div class="tablewrap"><table><thead><tr><th>subject</th>`;
+          for (const c of grp.cols) h += `<th>${esc(c)}</th>`;
+          h += `</tr></thead><tbody>`;
+          for (const s of grp.rows) {
+            h += `<tr${s === selId ? ' class="selrow"' : ""}>` +
+                 `<th class="rowh"><span class="node" data-id="${esc(s)}">${dot(roleOf.get(s))}${esc(s)}</span></th>`;
+            for (const c of grp.cols) {
+              const v = cell.get(s + SEP + c);
+              if (!v) { h += `<td class="blank"></td>`; continue; }
+              const hot = v.res === selId ? " hot" : "";
+              h += `<td><span class="cell${hot}" data-id="${esc(v.res)}">${esc(v.res)}</span></td>`;
+            }
+            h += `</tr>`;
+          }
+          h += `</tbody></table></div></div>`;
+        });
+        return h;
+      }
+
+      // ---- dispatch: all tabs render the SAME selection ----
       let view = "triples";
       function renderRight() {
         const id = selected();
-        viewEl.innerHTML = view === "table" ? renderTable(id) : renderTriples(id);
+        viewEl.innerHTML =
+          view === "table"  ? renderTable(id)  :
+          view === "tables" ? renderTables(id) :
+                              renderTriples(id);
       }
 
       // click a column header to sort; click any chip/cell to walk there

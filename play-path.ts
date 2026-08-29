@@ -49,6 +49,14 @@ for (let i = 1; ; i++) {
   for (const name of cols) row.apply(name);                 // apply the header-named functions
 }
 
+// ============ METHOD 3: NETWORK ENDPOINTS — a fourth record type ============
+g.def("ip",   s => s.split(":")[0]);
+g.def("port", s => s.split(":")[1]);
+for (const ep of ["192.168.1.10:8080", "192.168.1.10:443", "10.0.0.5:22"]) {
+  g.node(ep).apply("ip");
+  g.node(ep).apply("port");
+}
+
 // ============ #1 — the two methods land under DIFFERENT type nodes ==========
 console.log("=== fields do NOT converge — the header named them ===");
 console.log("  firstName() (old, hardcoded) →", membersOf("firstName")); // robert,alice (×2 each)
