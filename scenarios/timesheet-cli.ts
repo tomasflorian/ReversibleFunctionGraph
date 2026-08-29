@@ -22,21 +22,36 @@ import { execFile } from "node:child_process";
 const DATA = "ReversibleFunctionGraph2/data.js";
 const HTML = "ReversibleFunctionGraph2/graph.html";
 const g = new Graph();
+
+// A timesheet record is one pipe-joined string:  "emp|date|proj|hours|seq".
+// Each function below is taught to the graph under a name, and chops out one
+// field. `.apply("emp")` later runs the one named "emp".
+g.def("emp",   rec => rec.split("|")[0]);
+g.def("date",  rec => rec.split("|")[1]);
+g.def("proj",  rec => rec.split("|")[2]);
+g.def("hours", rec => rec.split("|")[3]);
+g.def("seq",   rec => rec.split("|")[4]);
+
+// the field names, in record order — used to chop a whole record at once
 const FIELDS = ["emp", "date", "proj", "hours", "seq"];
-FIELDS.forEach((f, i) => g.def(f, r => r.split("|")[i]));
 
 let seq = 0;
 const log: string[] = [];
 
-const nodes = (t: Tree): Node[] => t.items.filter((x): x is Node => x instanceof Node);
+// pull the Node objects out of a from()/to() Tree
+const nodes = (t: Tree): Node[] => t.items.filter(x => x instanceof Node) as Node[];
+
+// run one field-function on a record and hand back its string value (read a field)
 const field = (rec: string, f: string) => g.node(rec).apply(f).value;
+
+// the key that identifies one timesheet CELL: which employee, day, project
 const cellKey = (rec: string) => `${field(rec, "emp")}|${field(rec, "date")}|${field(rec, "proj")}`;
 
 function addEntry(emp: string, date: string, proj: string, hours: string): void {
   seq++;
   const rec = [emp, date, proj, hours, String(seq)].join("|");
-  log.push(rec);
-  for (const f of FIELDS) g.node(rec).apply(f);
+  log.push(rec);                                          // remember the write (append log)
+  for (const f of FIELDS) g.node(rec).apply(f);           // chop: store each field in the graph
   renderData(g, DATA);                                    // keep the viewer in sync
   console.log(`  logged #${seq}: ${emp} ${date} ${proj} ${hours}h`);
 }
