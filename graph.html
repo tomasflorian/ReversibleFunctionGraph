@@ -62,6 +62,13 @@
     .tablewrap { overflow: auto; }
     .tbl-block { margin: 8px 0 22px; }
     .tbl-block h3 { color: #dd6b20; }
+    .pathrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+               padding: 6px 0; border-bottom: 1px solid #1e1e1e; }
+    .node.static { cursor: default; }
+    .node.static:hover { background: none; }
+    .morebtn { margin-top: 12px; background: #2a2a2a; color: #ddd; border: 1px solid #555;
+               padding: 7px 12px; border-radius: 6px; cursor: pointer; font: 13px sans-serif; }
+    .morebtn:hover { border-color: #dd6b20; color: #fff; }
     table { border-collapse: collapse; font-size: 12px; }
     th, td { border: 1px solid #2c2c2c; padding: 4px 8px; text-align: left; white-space: nowrap; }
     thead th { position: sticky; top: 0; background: #1a1a1a; color: #999;
@@ -96,6 +103,7 @@
         <button class="tab on" data-view="triples">triples</button>
         <button class="tab" data-view="table">table</button>
         <button class="tab" data-view="tables">tables</button>
+        <button class="tab" data-view="paths">paths</button>
       </div>
       <div id="view"></div>
     </div>
@@ -350,6 +358,62 @@
         return h;
       }
 
+      // TAB 4 — PATHS (pick 2 nodes, find paths between them) -----------------
+      // Undirected simple-path search (edges walk both ways). Hubs are NOT
+      // special-cased — everything is a valid waypoint. We show the SHORTEST
+      // paths first; the + button widens to the next length that has more.
+      const P_ABSMAX = 10, P_MAXPATHS = 400;
+      let pathTier = 1, pathCache = null;
+
+      function computePaths(a, b) {
+        const key = a + " " + b;
+        if (pathCache && pathCache.key === key) return pathCache;
+        pathTier = 1;                                  // new pair → back to shortest
+        const paths = [], path = [a], visited = new Set([a]);
+        (function dfs(cur, depth) {
+          if (paths.length >= P_MAXPATHS) return;
+          if (cur === b && path.length > 1) { paths.push([...path]); return; }
+          if (depth >= P_ABSMAX) return;
+          for (const nb of network.getConnectedNodes(cur)) { // undirected neighbors
+            if (visited.has(nb)) continue;
+            visited.add(nb); path.push(nb);
+            dfs(nb, depth + 1);
+            path.pop(); visited.delete(nb);
+          }
+        })(a, 0);
+        paths.sort((p, q) => p.length - q.length);
+        const lengths = [...new Set(paths.map(p => p.length))]; // ascending unique node-counts
+        pathCache = { key, paths, lengths };
+        return pathCache;
+      }
+
+      const pathChip = id => `<span class="node static">${dot(roleOf.get(id))}${esc(id)}</span>`;
+      const pathRow  = p => `<div class="pathrow">` +
+        p.map(pathChip).join(`<span class="arrow">—</span>`) + `</div>`;
+
+      function renderPaths(a, b) {
+        const { paths, lengths } = computePaths(a, b);
+        if (paths.length === 0)
+          return `<div class="hint">no path between ${esc(a)} and ${esc(b)} ` +
+                 `(different components, or farther than ${P_ABSMAX} hops)</div>`;
+        const shownLen = lengths[Math.min(pathTier, lengths.length) - 1];
+        const shown = paths.filter(p => p.length <= shownLen);
+        let h = `<div class="head">${esc(a)} — ${esc(b)}</div>` +
+          `<h3>${shown.length} path(s), up to ${shownLen - 1} hops</h3>` +
+          shown.map(pathRow).join("");
+        if (pathTier < lengths.length)
+          h += `<button id="path-more" class="morebtn">+ longer paths (${lengths.length - pathTier} more length${lengths.length - pathTier > 1 ? "s" : ""})</button>`;
+        return h;
+      }
+
+      function renderPathsView() {
+        const two = [...seeds];
+        if (two.length !== 2)
+          return `<div class="hint">Pick <b>2</b> nodes (multi-select is on) to find paths ` +
+                 `between them. Selected: ${two.length}.</div>`;
+        return renderPaths(two[0], two[1]);
+      }
+
       // ---- dispatch: all tabs render the SAME selection ----
       let view = "triples";
       function renderRight() {
@@ -357,11 +421,13 @@
         viewEl.innerHTML =
           view === "table"  ? renderTable(id)  :
           view === "tables" ? renderTables(id) :
+          view === "paths"  ? renderPathsView() :
                               renderTriples(id);
       }
 
       // click a column header to sort; click any chip/cell to walk there
       viewEl.addEventListener("click", e => {
+        if (e.target.closest("#path-more")) { pathTier++; renderRight(); return; } // widen paths
         const th = e.target.closest("th.sortable");
         if (th) {                                  // sort by this column (toggle dir)
           const col = th.dataset.col;
@@ -380,6 +446,11 @@
         if (!tab) return;
         view = tab.dataset.view;
         document.querySelectorAll("#tabs .tab").forEach(t => t.classList.toggle("on", t === tab));
+        if (view === "paths" && !multi) {            // paths needs 2 seeds → turn multi on
+          multi = true;
+          btn.classList.add("on");
+          btn.textContent = "multi-select: on";
+        }
         renderRight();
       });
 
