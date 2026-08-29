@@ -1,6 +1,6 @@
 // play-flat.ts — functions calling functions (NESTED but FLAT), plus the
 // NOTHING / skip mechanic.
-//   npx tsx ReversibleFunctionGraph2/play-flat.ts
+//   npx tsx ReversibleFunctionGraph2/scenarios/flat.ts
 //
 // Two things shown together:
 //  1) FLAT: a function body uses another via g.apply(...). The inner call traces
@@ -10,8 +10,8 @@
 //     apply short-circuits on NOTHING, so a failed step carries through a chain
 //     and downstream functions NEVER run on it. The skip lives in apply.
 
-import { Graph, NOTHING } from "./graph.ts";
-import { renderData } from "./viz.ts";
+import { Graph, NOTHING } from "../graph.ts";
+import { renderData } from "../viz.ts";
 
 const g = new Graph();
 

@@ -1,5 +1,5 @@
 // play-types.ts — types are not declared, they are DISCOVERED.
-//   npx tsx ReversibleFunctionGraph2/play-types.ts
+//   npx tsx ReversibleFunctionGraph2/scenarios/types.ts
 //
 // A "type" here is just the extension of a predicate: the set of values it
 // accepts. Each predicate is identity-on-success (returns the value) and silent
@@ -13,8 +13,8 @@
 // And a value nobody has tested yet has NO type — not "untyped", just "not asked
 // yet". Types appear the moment you ask.
 
-import { Graph, NOTHING } from "./graph.ts";
-import { renderData } from "./viz.ts";
+import { Graph, NOTHING } from "../graph.ts";
+import { renderData } from "../viz.ts";
 
 const g = new Graph();
 const passed = (n: { value: string }) => n.value !== NOTHING;

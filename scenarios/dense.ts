@@ -1,5 +1,5 @@
 // play-dense.ts — pack the graph as DENSE as possible with representative ops.
-//   npx tsx ReversibleFunctionGraph2/play-dense.ts
+//   npx tsx ReversibleFunctionGraph2/scenarios/dense.ts
 //
 // Density in this model = COLLAPSE + REUSE. Every distinct string is one node, so
 // the way to make the graph dense (many edges, few nodes) is to choose inputs and
@@ -13,8 +13,8 @@
 //     letter nodes that first()/last() PRODUCE — so "a" is both an output hub and
 //     an input hub at once (the densest thing the model can express).
 
-import { Graph } from "./graph.ts";
-import { renderData } from "./viz.ts";
+import { Graph } from "../graph.ts";
+import { renderData } from "../viz.ts";
 
 const g = new Graph();
 g.def("length", s => String(s.length));

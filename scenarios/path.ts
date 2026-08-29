@@ -1,5 +1,5 @@
 // play-path.ts — two ways to ingest people, and why they DON'T converge.
-//   npx tsx ReversibleFunctionGraph2/play-path.ts
+//   npx tsx ReversibleFunctionGraph2/scenarios/path.ts
 //
 // Method 1 (old): I hardcode firstName/lastName and apply them. The field lands
 //   under firstName() because *I* named it that.
@@ -12,8 +12,8 @@
 // said "firstName", they'd converge — but the DATA decides that, not the code.
 // Non-convergence is the same mechanism as any two non-colliding strings.
 
-import { Graph, Node, Tree, NOTHING } from "./graph.ts";
-import { renderData } from "./viz.ts";
+import { Graph, Node, Tree, NOTHING } from "../graph.ts";
+import { renderData } from "../viz.ts";
 
 const g = new Graph();
 const nodes = (t: Tree): Node[] => t.items.filter((x): x is Node => x instanceof Node);
@@ -57,23 +57,17 @@ for (const ep of ["192.168.1.10:8080", "192.168.1.10:443", "10.0.0.5:22"]) {
   g.node(ep).apply("port");
 }
 
-// ============ #1 — the two methods land under DIFFERENT type nodes ==========
+// ============ #1 — the ingestion methods land under DIFFERENT type nodes =====
 console.log("=== fields do NOT converge — the header named them ===");
-console.log("  firstName() (old, hardcoded) →", membersOf("firstName")); // robert,alice (×2 each)
-console.log("  lastName()  (old, hardcoded) →", membersOf("lastName"));
-console.log("  first()     (from CSV header)→", membersOf("first"));      // carol, dave
-console.log("  last()      (from CSV header)→", membersOf("last"));
-console.log("  → firstName() ≠ first(): different strings, no merge. The DATA");
-console.log("    named the column. Header 'firstName' would have merged them.");
+console.log("  firstName() (old, hardcoded) ->", membersOf("firstName"));
+console.log("  lastName()  (old, hardcoded) ->", membersOf("lastName"));
+console.log("  first()     (from CSV header)->", membersOf("first"));
+console.log("  last()      (from CSV header)->", membersOf("last"));
+console.log("  ip()        (endpoints)      ->", membersOf("ip"));
+console.log("  port()      (endpoints)      ->", membersOf("port"));
+console.log("  -> firstName() != first(): different strings, no merge. The DATA named it.");
 
-// ============ #2 — the header names really are chopped from the CSV =========
-console.log("\n=== the column names are data — chopped from the raw CSV ===");
-console.log("  raw CSV node:", JSON.stringify(csv));
-console.log("  header line :", JSON.stringify(g.node(csv).apply("headerLine").value));
-console.log("  column names:", cols, " ← these became the function names");
-
-// ============ #3 — provenance: trace any field back to its ultimate raw =====
-// climb producers (skipping function nodes) until a node nobody produced.
+// ============ #2 — provenance: trace any field back to its ultimate raw ======
 function rootRaw(v: string): string {
   let cur = g.node(v);
   for (;;) {
@@ -83,11 +77,10 @@ function rootRaw(v: string): string {
   }
 }
 console.log("\n=== provenance is free — every field knows its ultimate raw ===");
-console.log("  carol  ← root:", JSON.stringify(rootRaw("carol")));  // the whole CSV blob
-console.log("  robert ← root:", JSON.stringify(rootRaw("robert"))); // a typed name string
-console.log("  (different roots = different ingestion paths, recorded automatically)");
+console.log("  carol  <- root:", JSON.stringify(rootRaw("carol")));   // the whole CSV blob
+console.log("  robert <- root:", JSON.stringify(rootRaw("robert")));  // a typed name string
 
-// ============ paths still work inside each record ===========================
+// ============ #3 — sibling paths inside a record =============================
 function siblingPaths(startVal: string, endVal: string): Node[][] {
   const start = g.node(startVal);
   const paths: Node[][] = [];
@@ -104,8 +97,8 @@ function siblingPaths(startVal: string, endVal: string): Node[][] {
 }
 const showPaths = (a: string, b: string) => {
   const ps = siblingPaths(a, b);
-  console.log(`\n${a} → ${b}:  ${ps.length} path(s)`);
-  for (const p of ps) console.log("   " + p.map(n => n.value).join("  →  "));
+  console.log(`\n${a} -> ${b}:  ${ps.length} path(s)`);
+  for (const p of ps) console.log("   " + p.map(n => n.value).join("  ->  "));
 };
 
 console.log("\n=== paths, per method ===");

@@ -1,6 +1,6 @@
 // play.ts — a tiny demo of RFG2. Run it, edit it, watch it re-run:
-//   npx tsx ReversibleFunctionGraph2/play.ts
-//   npx tsx watch ReversibleFunctionGraph2/play.ts
+//   npx tsx ReversibleFunctionGraph2/scenarios/basic.ts
+//   npx tsx watch ReversibleFunctionGraph2/scenarios/basic.ts
 //
 // This is v1's play.ts translated into v2's model. FORWARD apply is identical.
 // Two honest differences, flagged inline where they bite:
@@ -11,8 +11,8 @@
 //     unlabeled model. Function addressability is v2's clean answer instead.
 //   • digest() is deferred in v2, so CUT stops at the |-list.
 
-import { Graph } from "./graph.ts";
-import { renderData } from "./viz.ts";
+import { Graph } from "../graph.ts";
+import { renderData } from "../viz.ts";
 
 const g = new Graph();
 g.def("length", s => String(s.length));
