@@ -2,6 +2,7 @@
 //   npx tsx ReversibleFunctionGraph2/play.ts
 
 import { Graph } from "./graph.ts";
+import { renderData } from "./viz.ts";
 
 const g = new Graph();
 g.def("upper", s => s.toUpperCase());
@@ -26,3 +27,6 @@ g.node("5").from().from().flatten().log("flat ="); // [length(), paris, length()
 
 // FUNCTION ADDRESSABILITY — a function is a node; walk to every call that used it
 g.node("upper()").to().log("upper used in =");     // [upper(paris)]
+
+// write the graph data (open ReversibleFunctionGraph2/graph.html, reload after runs)
+renderData(g);

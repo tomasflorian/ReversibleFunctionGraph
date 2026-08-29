@@ -48,6 +48,9 @@ class Node {
   from(): Tree { return new Tree([...this.in]); }
   to(): Tree { return new Tree([...this.out]); }
 
+  // Outgoing edges of this node — for inspection / visualization.
+  links(): Node[] { return [...this.out]; }
+
   // ---- ERGONOMICS — display only ----
 
   log(label?: string): this {
@@ -134,6 +137,17 @@ class Graph {
     const impl = this.fns.get(fn);
     if (!impl) throw new Error(`no function named "${fn}"`);
     return impl(...args);
+  }
+
+  // A plain read-only view of the whole graph — for visualization.
+  // Edges are unlabeled (direction only); role is read from each node's string.
+  snapshot(): { nodes: string[]; edges: { from: string; to: string }[] } {
+    const all = [...this.nodes.values()];
+    const nodes = all.map(n => n.value);
+    const edges = all.flatMap(n =>
+      n.links().map(to => ({ from: n.value, to: to.value })),
+    );
+    return { nodes, edges };
   }
 }
 
