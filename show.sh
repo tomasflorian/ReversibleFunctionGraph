@@ -12,5 +12,5 @@ here="$(cd "$(dirname "$0")" && pwd)" # ReversibleFunctionGraph2/
 root="$(dirname "$here")"             # repo root (parent of this folder)
 cd "$root"
 
-npx tsx ReversibleFunctionGraph2/play-flat.ts
+npx tsx ReversibleFunctionGraph2/play-path.ts
 xdg-open ReversibleFunctionGraph2/graph.html
