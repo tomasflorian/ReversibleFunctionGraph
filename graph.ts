@@ -8,8 +8,22 @@
 // Navigation PRESERVES STRUCTURE: from()/to() return a Tree that nests one level
 // deeper per hop, so grouping is never lost. flatten() collapses it to one bag
 // when you actually want that.
+//
+// FAILURE / NOTHING: a function impl returns a string to RECORD a result, or JS
+// `null` to say "this happened but leave no trace" (the silent-filter case). On
+// null, apply records nothing and yields the one reserved NOTHING node. Applying
+// anything to NOTHING short-circuits back to NOTHING — so a broken step just
+// carries through a chain without every function having to guard for it. The
+// skip lives in apply, not in the functions (this is the Maybe/Option pattern).
+//
+// NOTHING is one reserved node with a distinctive string identity. It is the
+// only in-band sentinel; centralize every check through the NOTHING constant so
+// the representation can be swapped for an out-of-band identity later.
 
-type Fn = (...args: string[]) => string;
+const NOTHING = "∅"; // the single reserved "no value" node
+
+// A function returns a string (record it) or null (don't record — yield NOTHING).
+type Fn = (...args: string[]) => string | null;
 type Item = Node | Tree;
 
 class Node {
@@ -33,11 +47,21 @@ class Node {
 
   // Forward: compute fn(this, ...rest), build its Application subgraph, return the result.
   apply(fn: string, ...rest: string[]): Node {
-    const args = [this.value, ...rest];
-    const application = this.graph.node(`${fn}(${args.join(",")})`);
-    if (application.out.length > 0) return application.out[0]; // already computed
+    // NOTHING short-circuits: applying anything to it yields NOTHING, unrecorded.
+    // The skip lives here, so functions never see NOTHING and never run on it.
+    if (this.value === NOTHING) return this.graph.node(NOTHING);
 
-    const result = this.graph.node(this.graph.run(fn, args));
+    const args = [this.value, ...rest];
+    const key = `${fn}(${args.join(",")})`;
+
+    const memo = this.graph.find(key);                         // don't create on a miss
+    if (memo && memo.out.length > 0) return memo.out[0];       // already computed
+
+    const raw = this.graph.run(fn, args);                      // string | null
+    if (raw === null) return this.graph.node(NOTHING);         // "don't record" — yield NOTHING
+
+    const application = this.graph.node(key);                  // create ONLY when recording
+    const result = this.graph.node(raw);
     this.graph.node(`${fn}()`).linkTo(application);            // function ──▶ application
     for (const arg of args) this.graph.node(arg).linkTo(application); // args ──▶ application
     application.linkTo(result);                                // application ──▶ result
@@ -132,6 +156,12 @@ class Graph {
     return created;
   }
 
+  // Look up a node WITHOUT creating it (used by apply's memo check, so a
+  // non-recorded failure never leaves an orphan application node behind).
+  find(value: string): Node | undefined {
+    return this.nodes.get(value);
+  }
+
   // Graph-level apply: fn(args…), subject is arg 0 (same UFCS convention as
   // Node.apply). This is what a function BODY calls to use another function —
   // the inner call traces and memoizes like any other, and stays FLAT: it hangs
@@ -140,8 +170,9 @@ class Graph {
     return this.node(args[0]).apply(fn, ...args.slice(1));
   }
 
-  // Run a registered function on its arguments.
-  run(fn: string, args: string[]): string {
+  // Run a registered function on its arguments. Returns the impl's result:
+  // a string (record it) or null (don't record — apply yields NOTHING).
+  run(fn: string, args: string[]): string | null {
     const impl = this.fns.get(fn);
     if (!impl) throw new Error(`no function named "${fn}"`);
     return impl(...args);
@@ -159,4 +190,4 @@ class Graph {
   }
 }
 
-export { Graph, Node, Tree };
+export { Graph, Node, Tree, NOTHING };

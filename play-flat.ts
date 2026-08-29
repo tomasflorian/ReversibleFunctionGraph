@@ -1,82 +1,75 @@
-// play-flat.ts — functions calling functions, NESTED but FLAT.
+// play-flat.ts — functions calling functions (NESTED but FLAT), plus the
+// NOTHING / skip mechanic.
 //   npx tsx ReversibleFunctionGraph2/play-flat.ts
 //
-// A function body uses another function by calling g.apply(...). The inner call
-// traces and memoizes like any top-level call — but it stays FLAT: it hangs off
-// its OWN inputs as a sibling of the outer call. There is never an arrow from
-// one application to another, so an arrow keeps its single meaning (dataflow).
-//
-// The rule we're honoring: NEVER draw application → application. Inner calls are
-// siblings, not children. You can see two calls happened on the same value; you
-// can't (and don't) encode "this call invoked that call" as an edge.
+// Two things shown together:
+//  1) FLAT: a function body uses another via g.apply(...). The inner call traces
+//     and memoizes, but hangs off its OWN inputs as a sibling. Never an arrow
+//     from one application to another — an arrow keeps its one meaning.
+//  2) NOTHING: an impl returns a string to RECORD, or JS null to skip silently.
+//     apply short-circuits on NOTHING, so a failed step carries through a chain
+//     and downstream functions NEVER run on it. The skip lives in apply.
 
-import { Graph } from "./graph.ts";
+import { Graph, NOTHING } from "./graph.ts";
 import { renderData } from "./viz.ts";
 
 const g = new Graph();
 
-// a run-counter, so we can PROVE the inner call memoizes across nesting:
-// the impl body only runs on a genuine cache miss.
+// counters, to PROVE (a) memoization and (b) that downstream never runs on NOTHING
 let isValidIPRuns = 0;
+let lastOctetRuns = 0;
 
-// PRIMITIVE (plain JS) — a filter/guard: identity on success, "null" on failure.
-// (record-mode here, so the guard leaves a trace we can look at; a big-document
-//  filter would run silent — that's the dial, not built in this demo.)
+// FILTER/GUARD — identity on success, JS null on failure (silent: no trace).
 g.def("isValidIP", s => {
   isValidIPRuns++;
   const ok = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.test(s)
     && s.split(".").every(o => +o <= 255);
-  return ok ? s : "null";
+  return ok ? s : null;                 // <-- null = "don't record", yield NOTHING
 });
 
-// COMPOSITE — uses isValidIP THROUGH the graph, then does plain-JS guts.
-// g.apply("isValidIP", s) is the nested call: it traces + memoizes on its own.
-// The split(".") is mechanical guts — not worth a node, stays plain JS.
-g.def("lastOctet", s => {
-  const checked = g.apply("isValidIP", s);        // ← nested, traced, flat
-  if (checked.value === "null") return "null";    // short-circuit on failure
-  return checked.value.split(".")[3];
+// PURE extractor — assumes a valid IP. No guard inside: chaining guards it,
+// and apply guarantees this never runs on a failed value.
+g.def("lastOctet", s => { lastOctetRuns++; return s.split(".")[3]; });
+
+console.log("=== FORWARD: validate then extract, by CHAINING ===");
+g.node("192.168.1.3").apply("isValidIP").apply("lastOctet").log("good  =");  // 3
+// isValidIP("192.168.1.3") -> "192.168.1.3" (identity), then lastOctet -> "3"
+
+console.log("\n=== SKIP: a bad IP short-circuits; lastOctet NEVER runs ===");
+const bad = g.node("fifskje").apply("isValidIP").apply("lastOctet");
+bad.log("bad   =");                                       // ∅  (NOTHING)
+console.log("is NOTHING?", bad.value === NOTHING);        // true
+//  isValidIP("fifskje") -> null -> NOTHING (unrecorded)
+//  .apply("lastOctet") on NOTHING -> short-circuits -> NOTHING, impl skipped
+
+console.log("\n=== SILENT: the failed input left NO trace ===");
+g.node("fifskje").to().log("fifskje feeds =");            // []  (nothing recorded)
+
+console.log("\n=== the run counters prove skip + memo ===");
+console.log("isValidIP ran:", isValidIPRuns, "time(s)");  // 2 — good IP + bad IP
+console.log("lastOctet ran:", lastOctetRuns, "time(s)");  // 1 — good only (skipped on bad)
+
+// re-run the GOOD chain: fully recorded last time, so fully MEMOIZED now.
+g.node("192.168.1.3").apply("isValidIP").apply("lastOctet");
+console.log("after re-running the GOOD chain (memoized, no impl fires):");
+console.log("  isValidIP ran:", isValidIPRuns, "time(s)");  // still 2
+console.log("  lastOctet ran:", lastOctetRuns, "time(s)");  // still 1
+
+// re-run the BAD input: failures aren't recorded, so they can't be memoized —
+// the guard re-runs every time. An honest cost of "don't record failures".
+g.node("fifskje").apply("isValidIP");
+console.log("after re-running the BAD input (not memoized, guard re-fires):");
+console.log("  isValidIP ran:", isValidIPRuns, "time(s)");  // 3 — re-ran
+
+console.log("\n=== FLAT still holds: an inner call is a sibling, not a child ===");
+// a composite that validates INSIDE its body via g.apply — inner call is flat.
+g.def("octetSum", s => {
+  const ok = g.apply("isValidIP", s);                     // nested, traced, flat
+  if (ok.value === NOTHING) return null;                  // propagate the skip
+  return String(s.split(".").reduce((a, o) => a + +o, 0));
 });
-
-// ANOTHER COMPOSITE that ALSO validates — to show the inner call is SHARED.
-g.def("firstOctet", s => {
-  const checked = g.apply("isValidIP", s);        // same inner call as above
-  if (checked.value === "null") return "null";
-  return checked.value.split(".")[0];
-});
-
-const ip = "192.168.1.3";
-
-// --- run two composites on the same IP -------------------------------------
-g.node(ip).apply("lastOctet").log("lastOctet  =");   // 3
-g.node(ip).apply("firstOctet").log("firstOctet =");  // 192
-
-console.log("\n=== FLAT: the inner call is a SIBLING, not a child ===");
-// The value has THREE applications hanging off it — the two composites AND the
-// validation they each triggered. All siblings, all off `ip`.
-g.node(ip).to().log(`${ip} feeds =`);
-//  -> [lastOctet(192.168.1.3), isValidIP(192.168.1.3), firstOctet(192.168.1.3)]
-
-// Proof of flatness: lastOctet's OWN inputs are just its function + arg.
-// isValidIP is NOT among them — there is no application → application edge.
-g.node(`lastOctet(${ip})`).from().log("lastOctet's inputs =");
-//  -> [lastOctet(), 192.168.1.3]   (NOT isValidIP — that's the whole point)
-
-console.log("\n=== MEMOIZED: the shared inner call ran ONCE ===");
-// Both composites (and a direct call) route to the SAME isValidIP application.
-g.node(ip).apply("isValidIP");                       // a third route to it
-g.node("isValidIP()").to().log("isValidIP used in ="); // one application, shared
-//  -> [isValidIP(192.168.1.3)]
-console.log("isValidIP impl actually ran:", isValidIPRuns, "time(s)"); // 1
-
-console.log("\n=== IDENTITY-ON-SUCCESS: a passed value marks itself ===");
-// isValidIP(ip) -> ip, so the validation points BACK at its own input.
-// The value is both produced-by and used-by its validation (self-mark).
-g.node(ip).from().log(`${ip} produced by =`);        // [isValidIP(192.168.1.3)]
-
-console.log("\n=== FAILURE path (record-mode) leaves its own flat trace ===");
-g.node("192.168.1").apply("lastOctet").log("lastOctet(bad) =");   // null
-g.node("null").from().log('"null" produced by =');
-//  -> [isValidIP(192.168.1), lastOctet(192.168.1)]  (both siblings off the bad input)
+g.node("10.0.0.5").apply("octetSum").log("octetSum =");   // 15
+// octetSum's OWN inputs are just its function + arg — isValidIP is NOT among them
+g.node("octetSum(10.0.0.5)").from().log("octetSum inputs =");  // [octetSum(), 10.0.0.5]
 
 renderData(g);
