@@ -32,6 +32,14 @@ g.def("proj",  rec => rec.split("|")[2]);
 g.def("hours", rec => rec.split("|")[3]);
 g.def("seq",   rec => rec.split("|")[4]);
 
+// A date is itself a record "year-month-day" — so chop it one level deeper.
+// Each guards its input: not a date -> null -> NOTHING (silent, leaves no trace),
+// so year()/month()/day() only ever hold values chopped from a real date.
+const isDate = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d);
+g.def("year",  d => isDate(d) ? d.split("-")[0] : null);
+g.def("month", d => isDate(d) ? d.split("-")[1] : null);
+g.def("day",   d => isDate(d) ? d.split("-")[2] : null);
+
 // the field names, in record order — used to chop a whole record at once
 const FIELDS = ["emp", "date", "proj", "hours", "seq"];
 
@@ -52,6 +60,8 @@ function addEntry(emp: string, date: string, proj: string, hours: string): void 
   const rec = [emp, date, proj, hours, String(seq)].join("|");
   log.push(rec);                                          // remember the write (append log)
   for (const f of FIELDS) g.node(rec).apply(f);           // chop: store each field in the graph
+  const dateNode = g.node(rec).apply("date");             // then chop the date one level deeper
+  for (const f of ["year", "month", "day"]) dateNode.apply(f);
   renderData(g, DATA);                                    // keep the viewer in sync
   console.log(`  logged #${seq}: ${emp} ${date} ${proj} ${hours}h`);
 }
@@ -149,11 +159,11 @@ function handle(line: string): void {
 // seed some entries so the first `view` shows something (multiple people,
 // dates, and projects — bob works two projects on Monday, so his day sums).
 addEntry("bob",   "2026-08-25", "projX", "8");
-addEntry("bob",   "2026-08-25", "projY", "2");
-addEntry("alice", "2026-08-25", "projX", "5");
-addEntry("bob",   "2026-08-26", "projX", "4");
+addEntry("bob",   "2026-08-25", "projY", "12");
+addEntry("alice", "2026-11-25", "projX", "11");
+addEntry("bob",   "2026-12-26", "projX", "4");
 addEntry("carol", "2026-08-26", "projY", "7");
-addEntry("alice", "2026-08-26", "projX", "3");
+addEntry("alice", "2026-08-26", "projX", "12");
 console.log("\ninteractive timesheet — type 'help', 'view', or 'open'. try correcting bob:");
 console.log("  add bob 2026-08-25 projX 6\n");
 
