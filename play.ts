@@ -18,9 +18,11 @@ g.node("paris france").apply("strContains", "france").log("has =");  // has = tr
 // CHAINING — the result flows into the next call
 g.node("paris").apply("upper").apply("length").log("upper.len ="); // upper.len = 5  (length of PARIS)
 
-// REVERSE — unlabeled; the Application node sits in the path (two hops)
+// REVERSE — unlabeled; the Application node sits in the path (two hops).
+// Navigation preserves structure: each hop nests one level deeper.
 g.node("5").from().log("produced 5 =");            // [length(paris), length(PARIS)]
-g.node("5").from().from().log("their inputs =");   // [length(), paris, PARIS]
+g.node("5").from().from().log("their inputs =");   // [[length(), paris], [length(), PARIS]]  ← the tree
+g.node("5").from().from().flatten().log("flat ="); // [length(), paris, length(), PARIS]        ← opt-in bag
 
 // FUNCTION ADDRESSABILITY — a function is a node; walk to every call that used it
 g.node("upper()").to().log("upper used in =");     // [upper(paris)]

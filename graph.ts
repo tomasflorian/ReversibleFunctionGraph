@@ -5,13 +5,12 @@
 // edges, not types. Edges are unlabeled and directional, recorded once and
 // walkable both ways. One node per distinct string (dedup); nothing is lost.
 //
-// apply("fn", ...rest) computes fn(this, ...rest) and builds the little subgraph
-//   function ─┐
-//   arg0 ─────┼─▶ Application ─▶ result
-//   arg1 ─────┘
-// then returns the result node.
+// Navigation PRESERVES STRUCTURE: from()/to() return a Tree that nests one level
+// deeper per hop, so grouping is never lost. flatten() collapses it to one bag
+// when you actually want that.
 
 type Fn = (...args: string[]) => string;
+type Item = Node | Tree;
 
 class Node {
   readonly value: string;
@@ -45,9 +44,9 @@ class Node {
     return result;
   }
 
-  // Reverse / forward navigation over the unlabeled edges.
-  from(): NodeList { return new NodeList([...this.in]); }
-  to(): NodeList { return new NodeList([...this.out]); }
+  // Navigation: a node's direct inputs / outputs, as a one-level Tree.
+  from(): Tree { return new Tree([...this.in]); }
+  to(): Tree { return new Tree([...this.out]); }
 
   // ---- ERGONOMICS — display only ----
 
@@ -65,20 +64,27 @@ class Node {
   }
 }
 
-class NodeList {
-  // ---- STRUCTURE — batched over the members ----
-  constructor(readonly nodes: Node[]) {}
+// A structure-preserving collection: items are Nodes or nested Trees. from()/to()
+// map over the items, so each hop nests one level deeper (grouping is kept).
+class Tree {
+  // ---- STRUCTURE — batched over the members, structure preserved ----
+  constructor(readonly items: Item[]) {}
 
-  apply(fn: string, ...rest: string[]): NodeList {
-    return new NodeList(this.nodes.map(n => n.apply(fn, ...rest)));
+  from(): Tree { return new Tree(this.items.map(it => it.from())); }
+  to(): Tree { return new Tree(this.items.map(it => it.to())); }
+  apply(fn: string, ...rest: string[]): Tree {
+    return new Tree(this.items.map(it => it.apply(fn, ...rest)));
   }
-  from(): NodeList { return new NodeList(this.nodes.flatMap(n => n.from().nodes)); }
-  to(): NodeList { return new NodeList(this.nodes.flatMap(n => n.to().nodes)); }
+
+  // Collapse the tree to a flat Tree of leaf nodes (the opt-in "one bag").
+  flatten(): Tree {
+    return new Tree(this.leaves());
+  }
 
   // ---- ERGONOMICS — display only ----
 
   get values(): string[] {
-    return this.nodes.map(n => n.value);
+    return this.leaves().map(n => n.value);
   }
   log(label?: string): this {
     if (label === undefined) console.log(this.toString());
@@ -86,10 +92,20 @@ class NodeList {
     return this;
   }
   toString(): string {
-    return `[${this.values.join(", ")}]`;
+    return `[${this.items.map(it => it.toString()).join(", ")}]`;
   }
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.toString();
+  }
+
+  private leaves(): Node[] {
+    const out: Node[] = [];
+    const walk = (it: Item): void => {
+      if (it instanceof Tree) it.items.forEach(walk);
+      else out.push(it);
+    };
+    this.items.forEach(walk);
+    return out;
   }
 }
 
@@ -121,4 +137,4 @@ class Graph {
   }
 }
 
-export { Graph, Node, NodeList };
+export { Graph, Node, Tree };
