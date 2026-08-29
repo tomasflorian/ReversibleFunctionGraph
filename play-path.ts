@@ -1,80 +1,107 @@
-// play-path.ts — paths between fields, across TWO CONFLICTING formats.
+// play-path.ts — two ways to ingest people, and why they DON'T converge.
 //   npx tsx ReversibleFunctionGraph2/play-path.ts
 //
-// The raw string is the record. Different sources write it differently:
-//   Format A  "First Last"   ->  "robert smith"
-//   Format B  "Last, First"  ->  "smith, robert"   (order REVERSED — conflicting)
+// Method 1 (old): I hardcode firstName/lastName and apply them. The field lands
+//   under firstName() because *I* named it that.
+// Method 2 (CSV): the raw CSV is ONE string node. I chop it — header row, then
+//   data rows, then cells — and the COLUMN NAMES COME FROM THE HEADER (data).
+//   So a header of "first,last" makes the fields land under first()/last().
 //
-// firstName/lastName each detect the format and normalize. So both raws carve
-// out the SAME field values — and because values dedup, "robert" from format A
-// and "robert" from format B are ONE node. The two records meet at that node.
-//
-//   "robert smith"                 "smith, robert"
-//        │      │                      │      │
-//        ▼      ▼                      ▼      ▼
-//   firstName  lastName          lastName  firstName
-//        │      │                      │      │
-//        ▼      ▼                      ▼      ▼
-//     robert  smith  ◀── same nodes ──▶ smith  robert
-//
-// So robert → smith now has TWO paths — one per format. Multiple explanations.
+// firstName() and first() are different nodes, so the two methods do NOT merge.
+// That's correct: nothing says "first" means "firstName". If the CSV header had
+// said "firstName", they'd converge — but the DATA decides that, not the code.
+// Non-convergence is the same mechanism as any two non-colliding strings.
 
-import { Graph, Node, Tree } from "./graph.ts";
+import { Graph, Node, Tree, NOTHING } from "./graph.ts";
 import { renderData } from "./viz.ts";
 
 const g = new Graph();
-// ONE function per field, but it interprets EITHER format (comma ⇒ Last, First).
+const nodes = (t: Tree): Node[] => t.items.filter((x): x is Node => x instanceof Node);
+const membersOf = (fn: string): string[] => g.node(fn + "()").to().to().flatten().values;
+
+// ============ METHOD 1: OLD — hardcoded functions, two raw formats ==========
 g.def("firstName", s => (s.includes(",") ? s.split(", ")[1] : s.split(" ")[0]));
 g.def("lastName",  s => (s.includes(",") ? s.split(", ")[0] : s.split(" ")[1]));
-
-// Format A — "First Last"
-for (const raw of ["robert smith", "alice brown", "carol white"]) {
-  g.node(raw).apply("firstName");
-  g.node(raw).apply("lastName");
-}
-// Format B — "Last, First"  (robert & alice also appear here; carol does not)
-for (const raw of ["smith, robert", "brown, alice"]) {
+for (const raw of ["robert smith", "smith, robert",   // robert, two formats
+                   "alice brown",  "brown, alice"]) {  // alice,  two formats
   g.node(raw).apply("firstName");
   g.node(raw).apply("lastName");
 }
 
-// helper: the direct Nodes of a one-level from()/to() Tree
-const nodes = (t: Tree): Node[] => t.items.filter((x): x is Node => x instanceof Node);
+// ============ METHOD 2: CSV — raw stays a STRING, chop from there ============
+// The whole CSV is one node. These chop it (and leave the lineage behind):
+g.def("headerLine", c => c.split("\n")[0]);
+g.def("dataRow",   (c, n) => c.split("\n")[+n] ?? null);   // null past the end -> NOTHING
 
-// ---- generalized sibling walk: ALL V-paths from `start` to `end` ----------
-// climb UP to each raw that produced `start`, then DOWN every other branch,
-// collecting the ones that land on `end`. Same two rules as before:
-//   skip the function node on the way up; don't backtrack at the apex.
+const csv = "first,last\ncarol,white\ndave,green";          // <-- header is DATA
+g.node(csv);                                                // the raw CSV, as one node
+
+// read the header to learn the column names — they come from the data
+const cols = g.node(csv).apply("headerLine").value.split(",");   // ["first", "last"]
+
+// DYNAMICALLY define a field function per column, named by the header, by position
+cols.forEach((name, i) => g.def(name, row => row.split(",")[i] ?? null));
+
+// chop each data row out of the CSV, then each cell out of the row
+for (let i = 1; ; i++) {
+  const row = g.node(csv).apply("dataRow", String(i));
+  if (row.value === NOTHING) break;                         // ran out of rows
+  for (const name of cols) row.apply(name);                 // apply the header-named functions
+}
+
+// ============ #1 — the two methods land under DIFFERENT type nodes ==========
+console.log("=== fields do NOT converge — the header named them ===");
+console.log("  firstName() (old, hardcoded) →", membersOf("firstName")); // robert,alice (×2 each)
+console.log("  lastName()  (old, hardcoded) →", membersOf("lastName"));
+console.log("  first()     (from CSV header)→", membersOf("first"));      // carol, dave
+console.log("  last()      (from CSV header)→", membersOf("last"));
+console.log("  → firstName() ≠ first(): different strings, no merge. The DATA");
+console.log("    named the column. Header 'firstName' would have merged them.");
+
+// ============ #2 — the header names really are chopped from the CSV =========
+console.log("\n=== the column names are data — chopped from the raw CSV ===");
+console.log("  raw CSV node:", JSON.stringify(csv));
+console.log("  header line :", JSON.stringify(g.node(csv).apply("headerLine").value));
+console.log("  column names:", cols, " ← these became the function names");
+
+// ============ #3 — provenance: trace any field back to its ultimate raw =====
+// climb producers (skipping function nodes) until a node nobody produced.
+function rootRaw(v: string): string {
+  let cur = g.node(v);
+  for (;;) {
+    const up = nodes(cur.from()).filter(n => !n.value.endsWith("()"));
+    if (up.length === 0) return cur.value;
+    cur = up[0];
+  }
+}
+console.log("\n=== provenance is free — every field knows its ultimate raw ===");
+console.log("  carol  ← root:", JSON.stringify(rootRaw("carol")));  // the whole CSV blob
+console.log("  robert ← root:", JSON.stringify(rootRaw("robert"))); // a typed name string
+console.log("  (different roots = different ingestion paths, recorded automatically)");
+
+// ============ paths still work inside each record ===========================
 function siblingPaths(startVal: string, endVal: string): Node[][] {
   const start = g.node(startVal);
   const paths: Node[][] = [];
-  for (const app1 of nodes(start.from()))                    // apps that produced start
-    for (const raw of nodes(app1.from())) {                  // inputs of app1...
-      if (raw.value.endsWith("()")) continue;                // ...skip the function node
-      for (const app2 of nodes(raw.to())) {                  // other branches off the raw
+  for (const app1 of nodes(start.from()))
+    for (const raw of nodes(app1.from())) {
+      if (raw.value.endsWith("()")) continue;                // skip the function node
+      for (const app2 of nodes(raw.to())) {
         if (app2 === app1) continue;                         // don't backtrack at the apex
-        for (const out of nodes(app2.to()))                  // what those produced
+        for (const out of nodes(app2.to()))
           if (out.value === endVal) paths.push([start, app1, raw, app2, out]);
       }
     }
   return paths;
 }
-
 const showPaths = (a: string, b: string) => {
   const ps = siblingPaths(a, b);
   console.log(`\n${a} → ${b}:  ${ps.length} path(s)`);
   for (const p of ps) console.log("   " + p.map(n => n.value).join("  →  "));
 };
 
-// ---- the same field value is produced by BOTH formats (deduped into one) ---
-console.log("=== robert is produced by BOTH formats — one node, two producers ===");
-g.node("robert").from().log("robert produced by =");
-//  -> [firstName(robert smith), firstName(smith, robert)]
-
-// ---- paths: one per format where the person exists in both -----------------
-console.log("\n=== paths between fields — MULTIPLE explanations ===");
-showPaths("robert", "smith");   // 2 paths (format A and format B)
-showPaths("alice", "brown");    // 2 paths
-showPaths("carol", "white");    // 1 path  (carol only appears in format A)
+console.log("\n=== paths, per method ===");
+showPaths("robert", "smith");   // 2 — old method, both raw formats
+showPaths("carol", "white");    // 1 — CSV, through its one row
 
 renderData(g);

@@ -31,6 +31,7 @@ class Node {
   private graph: Graph;
   private in: Node[] = [];  // nodes pointing INTO this one  (producers / inputs)
   private out: Node[] = []; // nodes this points TO          (outputs / consumers)
+  private role?: "value" | "application"; // bipartite role (set by apply)
 
   constructor(value: string, graph: Graph) {
     this.value = value;
@@ -39,8 +40,26 @@ class Node {
 
   // ---- STRUCTURE — builds or reads the graph ----
 
+  // GUARD #1 — a node is a value OR an application, never both. Throws if a
+  // single string is asked to be both (e.g. a data value that collides with an
+  // application's call form, like a value "g(x)" meeting the call g(x)).
+  setRole(r: "value" | "application"): void {
+    if (this.role !== undefined && this.role !== r)
+      throw new Error(
+        `role violation: node ${JSON.stringify(this.value)} is already a ` +
+        `${this.role}, it cannot also be an ${r}`);
+    this.role = r;
+  }
+
   // Connect  this ──▶ target  (unlabeled, both ends remember it).
+  // GUARD #2 — the graph is BIPARTITE: every edge crosses value ↔ application.
+  // A value → value or application → application edge is illegal and throws.
   linkTo(target: Node): void {
+    if (this.role !== undefined && this.role === target.role)
+      throw new Error(
+        `bipartite violation: illegal ${this.role} → ${target.role} edge ` +
+        `${JSON.stringify(this.value)} → ${JSON.stringify(target.value)}; ` +
+        `every edge must connect a value to an application`);
     if (!this.out.includes(target)) this.out.push(target);
     if (!target.in.includes(this)) target.in.push(this);
   }
@@ -61,10 +80,21 @@ class Node {
     if (raw === null) return this.graph.node(NOTHING);         // "don't record" — yield NOTHING
 
     const application = this.graph.node(key);                  // create ONLY when recording
+    application.setRole("application");                         // this node is an application
+
     const result = this.graph.node(raw);
-    this.graph.node(`${fn}()`).linkTo(application);            // function ──▶ application
-    for (const arg of args) this.graph.node(arg).linkTo(application); // args ──▶ application
-    application.linkTo(result);                                // application ──▶ result
+    result.setRole("value");
+
+    const fnNode = this.graph.node(`${fn}()`);
+    fnNode.setRole("value");                                    // a function is a value
+    fnNode.linkTo(application);                                 // function ──▶ application
+
+    for (const arg of args) {
+      const a = this.graph.node(arg);
+      a.setRole("value");                                       // args are values
+      a.linkTo(application);                                    // arg ──▶ application
+    }
+    application.linkTo(result);                                 // application ──▶ result
     return result;
   }
 
@@ -74,6 +104,9 @@ class Node {
 
   // Outgoing edges of this node — for inspection / visualization.
   links(): Node[] { return [...this.out]; }
+
+  // The authoritative bipartite role (value if apply never touched it).
+  get roleName(): "value" | "application" { return this.role ?? "value"; }
 
   // ---- ERGONOMICS — display only ----
 
@@ -180,9 +213,12 @@ class Graph {
 
   // A plain read-only view of the whole graph — for visualization.
   // Edges are unlabeled (direction only); role is read from each node's string.
-  snapshot(): { nodes: string[]; edges: { from: string; to: string }[] } {
+  snapshot(): {
+    nodes: { value: string; role: "value" | "application" }[];
+    edges: { from: string; to: string }[];
+  } {
     const all = [...this.nodes.values()];
-    const nodes = all.map(n => n.value);
+    const nodes = all.map(n => ({ value: n.value, role: n.roleName }));
     const edges = all.flatMap(n =>
       n.links().map(to => ({ from: n.value, to: to.value })),
     );

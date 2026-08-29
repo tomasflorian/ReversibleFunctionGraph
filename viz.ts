@@ -13,13 +13,13 @@
 import { writeFileSync } from "node:fs";
 import type { Graph } from "./graph.ts";
 
-// Role read from a node's string form (see spec: role comes from structure).
-//   "upper()"        -> function   (empty parens: a function Value)
-//   "upper(paris)"   -> application (parens with args: one determinate call)
-//   "paris" / "5"    -> value       (a bare datum)
-function roleOf(value: string): "value" | "function" | "application" {
-  if (/^[^()]+\(\)$/.test(value)) return "function";
-  if (/^[^()]+\(.+\)$/.test(value)) return "application";
+// Display role. value-vs-application is AUTHORITATIVE from the engine (no more
+// guessing from the string — that's what mis-colored applications whose args
+// contain newlines/parens). The function-vs-value split is purely cosmetic, so
+// it's read from the safe empty-parens form "fn()".
+function displayRole(value: string, role: "value" | "application"): "value" | "function" | "application" {
+  if (role === "application") return "application";
+  if (/^[^()]+\(\)$/.test(value)) return "function"; // "upper()" — safe, no args
   return "value";
 }
 
@@ -27,7 +27,7 @@ function roleOf(value: string): "value" | "function" | "application" {
 function renderData(g: Graph, path = "ReversibleFunctionGraph2/data.js"): void {
   const { nodes, edges } = g.snapshot();
   const graph = {
-    nodes: nodes.map(value => ({ id: value, label: value, role: roleOf(value) })),
+    nodes: nodes.map(n => ({ id: n.value, label: n.value, role: displayRole(n.value, n.role) })),
     edges: edges.map(e => ({ from: e.from, to: e.to })), // unlabeled: direction only
   };
   writeFileSync(path, `window.GRAPH = ${JSON.stringify(graph)};\n`);
