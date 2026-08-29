@@ -32,6 +32,7 @@
     <div class="row"><span class="dot" style="background:#2b6cb0"></span>value — a datum</div>
     <div class="row"><span class="dot" style="background:#805ad5"></span>function — <code>fn()</code></div>
     <div class="row"><span class="dot" style="background:#dd6b20"></span>application — one call</div>
+    <div class="row" style="margin-top:6px; color:#999">arrows pan · <code>]</code> zoom in · <code>[</code> zoom out</div>
   </div>
   <div id="empty" style="display:none">
     No data.js found. Build a graph and call renderData(g), then reload.
@@ -39,22 +40,58 @@
   <script>
     const COLORS = { value: "#2b6cb0", function: "#805ad5", application: "#dd6b20" };
     const SHAPES = { value: "box", function: "box", application: "ellipse" };
+    const DIM = "#2a2a2a", DIM_FONT = "#555", DIM_EDGE = "#333", HOT_EDGE = "#fff";
 
     const data = window.GRAPH;
     if (!data) {
       document.getElementById("empty").style.display = "block";
     } else {
+      // remember each node's base color/role so we can dim and restore it.
+      const base = new Map(data.nodes.map(n => [n.id, COLORS[n.role] || COLORS.value]));
       const nodes = new vis.DataSet(data.nodes.map(n => ({
         id: n.id,
         label: n.label,
-        color: COLORS[n.role] || COLORS.value,
+        color: base.get(n.id),
         shape: SHAPES[n.role] || "box",
       })));
-      const edges = new vis.DataSet(data.edges);
-      new vis.Network(document.getElementById("net"), { nodes, edges }, {
+      const edges = new vis.DataSet(data.edges.map((e, i) => ({ id: i, ...e })));
+      const network = new vis.Network(document.getElementById("net"), { nodes, edges }, {
         nodes: { font: { color: "#fff" } },
         edges: { arrows: "to", color: "#888" }, // unlabeled: direction only
         physics: { barnesHut: { springLength: 130 } }, // "push apart and settle"
+        interaction: {
+          // scroll wheel off; drive zoom/pan from the KEYBOARD instead.
+          //   arrows -> pan,  [ -> zoom out,  ] -> zoom in
+          zoomView: false,
+          keyboard: { enabled: true, bindToWindow: true, speed: { x: 12, y: 12, zoom: 0.04 } },
+        },
+      });
+      network.fit(); // frame the whole graph on load, since wheel-zoom is off
+
+      // ---- click a node -> highlight it + its neighbors, dim everything else ----
+
+      function restore() {
+        nodes.update(data.nodes.map(n => ({
+          id: n.id, color: base.get(n.id), font: { color: "#fff" }, borderWidth: 1,
+        })));
+        edges.update(edges.getIds().map(id => ({ id, color: "#888" })));
+      }
+
+      function highlight(id) {
+        const keep = new Set([id, ...network.getConnectedNodes(id)]); // node + neighbors
+        const hotEdges = new Set(network.getConnectedEdges(id));
+        nodes.update(data.nodes.map(n => keep.has(n.id)
+          ? { id: n.id, color: base.get(n.id), font: { color: "#fff" },
+              borderWidth: n.id === id ? 4 : 1 } // clicked node gets a thick border
+          : { id: n.id, color: DIM, font: { color: DIM_FONT }, borderWidth: 1 }));
+        edges.update(edges.getIds().map(eid => ({
+          id: eid, color: hotEdges.has(eid) ? HOT_EDGE : DIM_EDGE,
+        })));
+      }
+
+      network.on("click", params => {
+        if (params.nodes.length) highlight(params.nodes[0]); // clicked a node
+        else restore();                                      // clicked empty space
       });
     }
   </script>
