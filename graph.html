@@ -20,8 +20,14 @@
     #app  { display: flex; height: 100%; }
     #left { position: relative; width: 50%; height: 100%; border-right: 1px solid #333; }
     #net  { width: 100%; height: 100%; }
-    #detail { width: 50%; height: 100%; overflow-y: auto; color: #ddd;
-              padding: 16px 18px; box-sizing: border-box; }
+    #detail { width: 50%; height: 100%; display: flex; flex-direction: column;
+              color: #ddd; box-sizing: border-box; }
+    #tabs { display: flex; gap: 4px; padding: 10px 12px 0; border-bottom: 1px solid #333; }
+    #tabs .tab { background: none; border: none; color: #888; cursor: pointer;
+                 font: 13px sans-serif; padding: 8px 14px; border-radius: 6px 6px 0 0; }
+    #tabs .tab:hover { color: #ddd; }
+    #tabs .tab.on { color: #fff; background: #222; border-bottom: 2px solid #dd6b20; }
+    #view { flex: 1; overflow: auto; padding: 16px 18px; }
 
     #empty { color: #888; padding: 1rem; }
     #legend {
@@ -51,6 +57,19 @@
     #detail .arrow { color: #666; }
     #detail .dot { width: 11px; height: 11px; border-radius: 3px; flex: none; }
     #detail .hint, #detail .empty { color: #666; font-style: italic; padding: 4px 8px; }
+
+    /* pivot table (Shape A: subject × function) */
+    .tablewrap { overflow: auto; }
+    table { border-collapse: collapse; font-size: 12px; }
+    th, td { border: 1px solid #2c2c2c; padding: 4px 8px; text-align: left; white-space: nowrap; }
+    thead th { position: sticky; top: 0; background: #1a1a1a; color: #999;
+               font-weight: normal; z-index: 1; }
+    th.rowh { position: sticky; left: 0; background: #1a1a1a; z-index: 1; }
+    td.blank { background: #161616; }
+    tr.selrow th.rowh, tr.selrow td { background: #2a2216; } /* selected row tint */
+    .cell { display: inline-block; padding: 2px 6px; border-radius: 5px; cursor: pointer; }
+    .cell:hover { background: #222; }
+    .cell.hot { background: #dd6b20; color: #fff; } /* cells whose result == selection */
   </style>
 </head>
 <body>
@@ -68,7 +87,13 @@
         No data.js found. Build a graph and call renderData(g), then reload.
       </div>
     </div>
-    <div id="detail"></div>
+    <div id="detail">
+      <div id="tabs">
+        <button class="tab on" data-view="triples">triples</button>
+        <button class="tab" data-view="table">table</button>
+      </div>
+      <div id="view"></div>
+    </div>
   </div>
   <script>
     const COLORS = { value: "#2b6cb0", function: "#805ad5", application: "#dd6b20" };
@@ -141,13 +166,13 @@
         if (!multi) seeds.clear();                   // single mode: replace
         seeds.has(id) ? seeds.delete(id) : seeds.add(id); // click again to drop it
         render();
-        renderDetail(seeds.has(id) ? id : null);     // right pane follows the click
+        renderRight();                               // right pane follows the click
       }
 
       function clearSelection() {
         seeds.clear();
         render();
-        renderDetail(null);
+        renderRight();
       }
 
       network.on("click", params => {
@@ -155,10 +180,12 @@
         else clearSelection();                                // clicked empty space
       });
 
-      // ---- RIGHT PANE: the clicked node's neighbors, split by edge direction ----
+      // ---- RIGHT PANE: tabbed views over the SAME selection ----
 
       const roleOf = new Map(data.nodes.map(n => [n.id, n.role]));
       const detail = document.getElementById("detail");
+      const viewEl = document.getElementById("view");
+      const selected = () => (seeds.size ? [...seeds][seeds.size - 1] : null); // last-clicked
 
       const esc = s => String(s).replace(/[&<>"']/g, c =>
         ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -181,37 +208,95 @@
       const triples = apps => apps.length
         ? apps.map(triple).join("") : `<li class="empty">none</li>`;
 
-      function renderDetail(id) {
-        if (!id) {
-          detail.innerHTML = `<div class="hint">Click a node to see its triples.</div>`;
-          return;
-        }
+      // TAB 1 — TRIPLES (scoped to the selected node) --------------------------
+      function renderTriples(id) {
+        if (!id) return `<div class="hint">Click a node to see its triples.</div>`;
         const head = `<div class="head">${dot(roleOf.get(id))}<b>${esc(id)}</b>` +
           `<span class="role">${roleOf.get(id)}</span></div>`;
-
         if (isApp(id)) {
-          // an application IS one triple; also show what it consumes (fn + args)
           const inputs = network.getConnectedNodes(id, "from");
-          detail.innerHTML = head +
+          return head +
             `<h3>this call</h3><ul>${triple(id)}</ul>` +
             `<h3>inputs · ${inputs.length}</h3><ul>${plain(inputs)}</ul>`;
-          return;
         }
-        // a value (or function): show the calls it takes part in, as triples
         const producedBy = network.getConnectedNodes(id, "from").filter(isApp); // App → this
         const usedIn     = network.getConnectedNodes(id, "to").filter(isApp);   // this → App
-        detail.innerHTML = head +
+        return head +
           `<h3>produced by · ${producedBy.length}</h3><ul>${triples(producedBy)}</ul>` +
           `<h3>used in · ${usedIn.length}</h3><ul>${triples(usedIn)}</ul>`;
       }
 
-      // click any chip (the call OR the result) to walk there — shared selection
-      detail.addEventListener("click", e => {
-        const chipEl = e.target.closest(".node[data-id]");
-        if (chipEl) selectNode(chipEl.getAttribute("data-id"));
+      // TAB 2 — TABLE (whole-graph pivot; Shape A: subject × function) ----------
+      // A table is a PIVOT of the triples: row = arg0 (subject), column = the
+      // function (with any extra args folded into the column name), cell = result.
+      // Built straight from structure — each Application's from()=[fn,args],
+      // to()=result — no string parsing. dedup means every cell is already unique.
+      const SEP = "\u0000";
+      function buildPivot() {
+        const cell = new Map();                 // `subject SEP col` -> { res, app }
+        const subjects = [], columns = [], seenS = new Set(), seenC = new Set();
+        for (const n of data.nodes) {
+          if (n.role !== "application") continue;
+          const inputs  = network.getConnectedNodes(n.id, "from");
+          const fnNode  = inputs.find(x => roleOf.get(x) === "function");
+          const dataIns = inputs.filter(x => roleOf.get(x) !== "function"); // [arg0, arg1…]
+          if (!fnNode || dataIns.length === 0) continue;
+          const fnName  = fnNode.replace(/\(\)$/, "");
+          const subject = dataIns[0];
+          const extra   = dataIns.slice(1);
+          const col = extra.length ? `${fnName}(·,${extra.join(",")})` : fnName;
+          const res = network.getConnectedNodes(n.id, "to")[0];
+          cell.set(subject + SEP + col, { res, app: n.id });
+          if (!seenS.has(subject)) { seenS.add(subject); subjects.push(subject); }
+          if (!seenC.has(col))     { seenC.add(col);     columns.push(col); }
+        }
+        subjects.sort(); columns.sort();
+        return { subjects, columns, cell };
+      }
+      const pivot = buildPivot();
+
+      function renderTable(selId) {
+        const { subjects, columns, cell } = pivot;
+        let h = `<div class="tablewrap"><table><thead><tr><th></th>`;
+        for (const c of columns) h += `<th>${esc(c)}</th>`;
+        h += `</tr></thead><tbody>`;
+        for (const s of subjects) {
+          h += `<tr${s === selId ? ' class="selrow"' : ""}>` +
+               `<th class="rowh"><span class="node" data-id="${esc(s)}">${dot(roleOf.get(s))}${esc(s)}</span></th>`;
+          for (const c of columns) {
+            const v = cell.get(s + SEP + c);
+            if (!v) { h += `<td class="blank"></td>`; continue; }
+            const hot = v.res === selId ? " hot" : ""; // same result as selection lights up
+            h += `<td><span class="cell${hot}" data-id="${esc(v.res)}">${esc(v.res)}</span></td>`;
+          }
+          h += `</tr>`;
+        }
+        return h + `</tbody></table></div>`;
+      }
+
+      // ---- dispatch: both tabs render the SAME selection ----
+      let view = "triples";
+      function renderRight() {
+        const id = selected();
+        viewEl.innerHTML = view === "table" ? renderTable(id) : renderTriples(id);
+      }
+
+      // click any chip/cell (the call, the result, a subject) to walk there
+      viewEl.addEventListener("click", e => {
+        const el = e.target.closest("[data-id]");
+        if (el) selectNode(el.getAttribute("data-id"));
       });
 
-      renderDetail(null); // initial hint
+      // tab switching — swaps the renderer, keeps the selection
+      document.getElementById("tabs").addEventListener("click", e => {
+        const tab = e.target.closest(".tab");
+        if (!tab) return;
+        view = tab.dataset.view;
+        document.querySelectorAll("#tabs .tab").forEach(t => t.classList.toggle("on", t === tab));
+        renderRight();
+      });
+
+      renderRight(); // initial
 
       const btn = document.getElementById("multi");
       btn.addEventListener("click", () => {
