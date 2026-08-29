@@ -113,6 +113,60 @@ isNumber() ──▶ isNumber(5)
   separate `viz.ts` (litmus: does deleting it change the graph?).
 - `viz.ts` visualization + stable `graph.html` shell + `data.js` output.
 
+## API sketch
+
+```ts
+class Graph {
+  def(name: string, impl: (...args: string[]) => string): void; // register a function
+  node(value: string): Node;                                    // the one node for a value
+}
+
+interface Node {
+  readonly value: string;
+
+  // forward: fn(this, ...rest); builds the Application subgraph, returns the result Value node
+  apply(fn: string, ...rest: string[]): Node;
+
+  // navigation over UNLABELED edges:
+  from(): NodeList; // nodes pointing INTO this one  (its producers / inputs)
+  to():   NodeList; // nodes this points TO          (its outputs / consumers)
+
+  log(label?: string): this;
+}
+// NodeList: from()/to() results — .apply / .from / .to / .log / .values, over many.
+```
+
+## Sample play.ts
+
+```ts
+const g = new Graph();
+g.def("upper", s => s.toUpperCase());
+g.def("length", s => String(s.length));
+g.def("strContains", (h, n) => String(h.includes(n)));
+
+// FORWARD — apply returns the result Value; the Application node is built behind it
+g.node("paris").apply("upper").log("upper =");                   // upper = PARIS
+g.node("paris").apply("length").log("length =");                 // length = 5
+
+// MULTI-ARG (UFCS: subject is arg 0)
+g.node("paris france").apply("strContains", "france").log("has =");  // has = true
+
+// CHAINING (the result flows into the next call)
+g.node("paris").apply("upper").apply("length").log();            // 5
+
+// REVERSE — unlabeled; the Application node now sits in the path (two hops)
+g.node("5").from().log("produced 5 =");           // [length(paris)]   ← the applications
+g.node("5").from().from().log("their inputs =");  // [length(), paris] ← inputs (incl. the function)
+
+// FUNCTION ADDRESSABILITY — a function is a node; walk to every call that used it
+g.node("upper()").to().log("upper used in =");    // [upper(paris)]
+```
+
+Note the one real shift from `graph.ts`: reverse is now **two hops** (value →
+Application → inputs), because the Application is reified in between. More
+indirect, but that indirection *is* the win — the Application (and the function)
+are addressable nodes you can land on, query, and later hang metadata on.
+
 ## Decisions (resolved)
 
 - **One `Node` class; Value/Application are structural roles**, read from string
