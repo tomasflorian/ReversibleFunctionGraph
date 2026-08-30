@@ -1,16 +1,17 @@
-// timesheet-cli.ts — INTERACTIVE console timesheet, written on the ergo window.
+// timesheet-cli.ts — INTERACTIVE console timesheet on the ergo window.
 //   npx tsx ReversibleFunctionGraph2/scenarios/timesheet-cli.ts
 //
-// Same graph as before, but the raw plumbing (chop loops, .apply(f).value,
-// nextOf/prevOf string-parsing) is gone — it lives in ergo.ts now. This file is
-// just domain logic: entries are records, corrections are edits, current is the
-// tip of an edit chain, views auto-resolve. Nothing mutates; views are queries.
+// Nodes are shown RAW (pipe-delimited) everywhere, so you can copy a line from
+// `list`/`log` straight into `edit`. `edit` is fully generic: edit <old> -> <new>
+// for ANY two strings — a whole row, a single value, anything. It just draws the
+// edit edge; it knows nothing about schema. Views resolve by walking edits from
+// each log root to its current tip, so an edit updates the view with no fuss.
 //
-//   add <emp> <date> <proj> <hours>                        start a NEW entry
-//   edit <emp date proj hours> -> <emp date proj hours>    edit a whole row into an edited row
-//   list                                                   current entries (copy a row to edit it)
-//   view                                                   grid: employee x date, current hours/day
-//   history <#>                                            the edit chain of entry #<#>
+//   add <emp> <date> <proj> <hours>        start a NEW entry (a root)
+//   edit <old> -> <new>                    edit any raw string into any raw string
+//   history <node>                         the edit chain through a raw node
+//   list                                   current entries, raw (copy one to edit it)
+//   view                                   grid: employee x date, current hours/day
 //   log / open / help / quit
 
 import { Graph } from "../graph.ts";
@@ -26,46 +27,38 @@ const g = new Graph();
 const e = ergo(g);
 
 const isDate = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d);
-const Entry = e.record("|", ["emp", "date", "proj", "hours"]); // an entry
-const Day   = e.record("-", ["year", "month", "day"], isDate); // a date, chopped deeper
-const edit  = e.versioned("edit");                             // correction chains
+const Entry = e.record("|", ["emp", "date", "proj", "hours"]);
+const Day   = e.record("-", ["year", "month", "day"], isDate);
+const edit  = e.versioned("edit");
 
-const log: string[] = []; // every record appended (order here is irrelevant)
+const log: string[] = []; // the roots we've added (chain starts)
 
-// store a record fully: its fields, and its date one level deeper
-const store = (rec: string) => { Entry.chop(rec); Day.chop(Entry.read(rec, "date")); };
-
-// current entries = chain tips (nothing edits them), unique, ordered by their
-// chain ROOT's position — so an entry keeps its slot even after its tip changes.
+// current entries = for each root, its current tip (walk edits forward)
 function current(): string[] {
-  const seen = new Set<string>(), tips: string[] = [];
-  for (const r of log) if (edit.next(r) === null && !seen.has(r)) { seen.add(r); tips.push(r); }
-  return tips.sort((a, b) => log.indexOf(edit.root(a)) - log.indexOf(edit.root(b)));
+  const seen = new Set<string>(), roots: string[] = [];
+  for (const r of log) if (edit.prev(r) === null && !seen.has(r)) { seen.add(r); roots.push(r); }
+  return roots.map(r => edit.tip(r));
 }
 
 function addEntry(emp: string, date: string, proj: string, hours: string): void {
   const rec = Entry.make(emp, date, proj, hours);
-  store(rec);
+  Entry.chop(rec); Day.chop(Entry.read(rec, "date"));   // eager-chop a new root
   log.push(rec);
   renderData(g, DATA);
-  console.log(`  added: ${emp} ${date} ${proj} ${hours}h`);
+  console.log(`  added: ${rec}`);
 }
 
-function editRow(oldRec: string, newRec: string): void {
-  if (!current().includes(oldRec)) {
-    console.log(`  "${oldRec.replace(/\|/g, " ")}" is not a current entry (see 'list')`); return;
-  }
-  if (newRec === oldRec) { console.log("  no change"); return; }
-  store(newRec);
-  edit.apply(oldRec, newRec);                              // one edge; that's the whole correction
-  log.push(newRec);
+// GENERIC edit — any raw string into any raw string. Just draws the edge.
+function editAny(oldRaw: string, newRaw: string): void {
+  if (oldRaw === newRaw) { console.log("  no change"); return; }
+  edit.apply(oldRaw, newRaw);
   renderData(g, DATA);
-  console.log(`  edited:  ${oldRec.replace(/\|/g, " ")}  ->  ${newRec.replace(/\|/g, " ")}`);
+  console.log(`  edited: ${oldRaw}  ->  ${newRaw}`);
 }
 
 function view(): void {
   const cell = new Map<string, number>(), emps = new Set<string>(), dates = new Set<string>();
-  for (const r of current()) {                            // auto-resolves to tips
+  for (const r of current()) {
     const em = Entry.read(r, "emp"), d = Entry.read(r, "date");
     emps.add(em); dates.add(d);
     cell.set(`${em}|${d}`, (cell.get(`${em}|${d}`) ?? 0) + Number(Entry.read(r, "hours")));
@@ -84,16 +77,13 @@ function view(): void {
 function list(): void {
   const cur = current();
   if (!cur.length) { console.log("  (empty)"); return; }
-  cur.forEach((r, i) => console.log(`  [${i}]  ${r.replace(/\|/g, "  ")}`));
+  cur.forEach(r => console.log("  " + r));            // RAW — copy one into `edit`
 }
 
-function history(idx: number): void {
-  const tip = current()[idx];
-  if (tip === undefined) { console.log(`  no current entry #${idx}`); return; }
-  const chain = edit.chain(tip);
-  console.log(`  entry #${idx} — ${chain.length} version(s), oldest first:`);
-  chain.forEach((r, i) =>
-    console.log(`     ${i === chain.length - 1 ? "* " : "  "}${r.replace(/\|/g, "  ")}${i === chain.length - 1 ? "   (current)" : ""}`));
+function history(node: string): void {
+  const chain = edit.chain(node);
+  console.log(`  ${chain.length} version(s), oldest first:`);
+  chain.forEach((r, i) => console.log(`     ${i === chain.length - 1 ? "* " : "  "}${r}`));
 }
 
 function openBrowser(): void {
@@ -103,36 +93,40 @@ function openBrowser(): void {
 }
 
 const HELP = `commands:
-  add <emp> <date> <proj> <hours>                        start a NEW entry
-  edit <emp date proj hours> -> <emp date proj hours>    edit a whole row into an edited row
-  list                                                   current entries (copy a row to edit it)
-  view                                                   grid: employee x date, current hours/day
-  history <#>                                            the edit chain of entry #<#>
-  log                                                    every record ever (order lives in edges)
+  add <emp> <date> <proj> <hours>    start a NEW entry (a root)
+  edit <old> -> <new>                edit any raw string into any raw string
+  history <node>                     the edit chain through a raw node
+  list                               current entries, raw (copy one to edit it)
+  view                               grid: employee x date, current hours/day
+  log                                every root added, raw
   open / help / quit`;
 
 function handle(line: string): void {
-  const [cmd, ...a] = line.split(/\s+/).filter(Boolean);
+  const trimmed = line.trim();
+  const [cmd, ...a] = trimmed.split(/\s+/).filter(Boolean);
   switch (cmd) {
     case undefined: return;
     case "add":
       if (a.length !== 4) { console.log("  usage: add <emp> <date> <proj> <hours>"); return; }
       addEntry(a[0], a[1], a[2], a[3]); return;
     case "edit": {
-      const i = a.indexOf("->");                          // split old row  ->  new row
-      if (i !== 4 || a.length !== 9) {
-        console.log("  usage: edit <emp date proj hours> -> <emp date proj hours>"); return;
+      const body = trimmed.replace(/^edit\s+/, "");
+      const parts = body.split(" -> ");                // raw old  ->  raw new (verbatim)
+      if (parts.length !== 2 || !parts[0] || !parts[1]) {
+        console.log("  usage: edit <old> -> <new>   (raw strings, e.g. from `list`)"); return;
       }
-      editRow(a.slice(0, 4).join("|"), a.slice(5).join("|")); return;
+      editAny(parts[0], parts[1]); return;
+    }
+    case "history": {
+      const node = trimmed.replace(/^history\s+/, "");
+      if (!node || node === "history") { console.log("  usage: history <node>"); return; }
+      history(node); return;
     }
     case "list": list(); return;
     case "view": view(); return;
-    case "history":
-      if (a.length !== 1) { console.log("  usage: history <#>"); return; }
-      history(+a[0]); return;
     case "log":
       if (!log.length) { console.log("  (empty)"); return; }
-      log.forEach((r, i) => console.log(`  #${i + 1}  ${r.replace(/\|/g, "  ")}`)); return;
+      log.forEach(r => console.log("  " + r)); return;
     case "open": case "graph": openBrowser(); return;
     case "help": console.log(HELP); return;
     case "quit": case "exit": rl.close(); return;
@@ -147,8 +141,8 @@ addEntry("alice", "2026-11-25", "projX", "11");
 addEntry("bob",   "2026-12-26", "projX", "4");
 addEntry("carol", "2026-08-26", "projY", "7");
 addEntry("alice", "2026-08-26", "projX", "12");
-console.log("\ntimesheet — 'add' starts an entry; edit a whole row into an edited row:");
-console.log("try:  edit bob 2026-08-25 projX 8 -> bob 2026-08-25 projZ 6\n");
+console.log("\ntimesheet — copy a raw row from `list` and edit it (any part):");
+console.log("  edit bob|2026-08-25|projX|8 -> bob|2026-08-25|projZ|6\n");
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: "timesheet> " });
 rl.prompt();
