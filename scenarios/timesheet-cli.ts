@@ -1,18 +1,20 @@
 // timesheet-cli.ts — an INTERACTIVE console timesheet on the graph.
 //   npx tsx ReversibleFunctionGraph2/scenarios/timesheet-cli.ts
 //
-// Ordering is IN THE GRAPH, not in a counter. A record is "emp|date|proj|hours"
-// (no seq!). Correcting a cell appends a new record AND draws a `supersedes`
-// edge from the old observation to the new one. "Current" is the tip of that
-// chain — the observation nothing supersedes — found by walking edges. There is
-// no out-of-band counter or clock anywhere; the order is the structure.
+// An entry is a whole record "emp|date|proj|hours". Its IDENTITY is a CHAIN of
+// edits, not its field values — so you can edit ANY field (even the project) and
+// it's still the same entry. `edit(old, new) -> new` links a correction:
+//     old -> edit(old,new) -> new
+// "Current" is the tip of the chain (nothing edits it). Views auto-resolve to
+// the tip; the old versions stay in the graph as history. No counter, no clock —
+// ordering is the edit edges. Nothing here mutates; views are re-run queries.
 //
-//   add <emp> <date> <proj> <hours>   log time (edit = add again for same cell)
-//   view                              grid: employee x date, current hours/day
-//   list                              every current cell (emp,date,proj -> hours)
-//   history <emp> <date> <proj>       the supersedes chain, oldest -> current
-//   log                               the raw append log (unordered; order is edges)
-//   open / help / quit
+//   add <emp> <date> <proj> <hours>          start a NEW entry
+//   edit <#> <emp> <date> <proj> <hours>     correct current entry #<#> (any field)
+//   list                                     current entries, numbered (for edit)
+//   view                                     grid: employee x date, current hours/day
+//   history <#>                              the edit chain of entry #<#>, oldest -> current
+//   log / open / help / quit
 
 import { Graph, Node, Tree } from "../graph.ts";
 import { renderData } from "../viz.ts";
@@ -23,80 +25,94 @@ const DATA = "ReversibleFunctionGraph2/data.js";
 const HTML = "ReversibleFunctionGraph2/graph.html";
 const g = new Graph();
 
-// A record is "emp|date|proj|hours" — each function chops out one field.
+// a record is "emp|date|proj|hours" — each function chops out one field
 g.def("emp",   rec => rec.split("|")[0]);
 g.def("date",  rec => rec.split("|")[1]);
 g.def("proj",  rec => rec.split("|")[2]);
 g.def("hours", rec => rec.split("|")[3]);
 
-// A date is itself "year-month-day" — chop one level deeper, guarded.
+// a date is itself "year-month-day" — chop one level deeper, guarded
 const isDate = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d);
 g.def("year",  d => isDate(d) ? d.split("-")[0] : null);
 g.def("month", d => isDate(d) ? d.split("-")[1] : null);
 g.def("day",   d => isDate(d) ? d.split("-")[2] : null);
 
-// supersedes(old, new) asserts "new replaces old". It just returns `new` (the
-// winner), so the edge runs  old -> supersedes(old,new) -> new.  Ordering = this.
-g.def("supersedes", (_old, neu) => neu);
+// edit(old, new) asserts "old was edited into new". Returns new (the winner),
+// so the edge is  old -> edit(old,new) -> new.  Ordering = these edges.
+g.def("edit", (_old, neu) => neu);
 
 const FIELDS = ["emp", "date", "proj", "hours"];
-const log: string[] = []; // every appended record (UNORDERED — order lives in edges)
+const log: string[] = []; // every record ever appended (order here doesn't matter)
 
 const nodes = (t: Tree): Node[] => t.items.filter(x => x instanceof Node) as Node[];
 const field = (rec: string, f: string) => g.node(rec).apply(f).value;
-const cellKey = (rec: string) => `${field(rec, "emp")}|${field(rec, "date")}|${field(rec, "proj")}`;
+const chop = (rec: string) => {                          // store a record's fields in the graph
+  for (const f of FIELDS) g.node(rec).apply(f);
+  const dateNode = g.node(rec).apply("date");
+  for (const f of ["year", "month", "day"]) dateNode.apply(f);
+};
 
-// walk one step forward: the record that supersedes `rec`, or null if it's the tip
+// one step FORWARD along edits: the record that edited `rec`, or null if it's the tip
 function nextOf(rec: string): string | null {
   for (const app of nodes(g.node(rec).to()))
-    if (app.value.startsWith(`supersedes(${rec},`)) return nodes(app.to())[0].value;
+    if (app.value.startsWith(`edit(${rec},`)) return nodes(app.to())[0].value;
   return null;
 }
-// the current observation of a cell = the one nothing supersedes (chain tip)
-const tipOf = (recs: string[]) => recs.find(r => nextOf(r) === null);
-// the whole chain of a cell, oldest -> tip (root = the record that is nobody's `next`)
-function chainOf(recs: string[]): string[] {
-  const nexts = new Set(recs.map(nextOf));
-  let cur = recs.find(r => !nexts.has(r));
-  const out: string[] = [];
-  while (cur) { out.push(cur); cur = nextOf(cur) ?? undefined; }
-  return out;
+// one step BACK: the record `rec` was edited FROM, or null if it's the chain root
+function prevOf(rec: string): string | null {
+  for (const app of nodes(g.node(rec).from()))
+    if (app.value.startsWith("edit(") && app.value.endsWith(`,${rec})`))
+      return nodes(app.from()).map(n => n.value).find(v => !v.endsWith("()") && v !== rec) ?? null;
+  return null;
 }
-
-function recsByCell(): Map<string, string[]> {
-  const cells = new Map<string, string[]>();
-  for (const rec of log) (cells.get(cellKey(rec)) ?? cells.set(cellKey(rec), []).get(cellKey(rec))!).push(rec);
-  return cells;
+// the chain ROOT of a record = its stable identity (walk edits all the way back)
+function rootOf(rec: string): string {
+  let cur = rec;
+  for (let p = prevOf(cur); p; p = prevOf(cur)) cur = p;
+  return cur;
 }
-// cellKey -> current record (the tip)
-function current(): Map<string, string> {
-  const out = new Map<string, string>();
-  for (const [key, recs] of recsByCell()) { const t = tipOf(recs); if (t) out.set(key, t); }
+// current entries = the chain tips (nothing edits them), ordered by their ROOT's
+// original position — so an entry keeps its slot even after its tip changes.
+function currentEntries(): string[] {
+  const seen = new Set<string>(), tips: string[] = [];
+  for (const r of log) if (nextOf(r) === null && !seen.has(r)) { seen.add(r); tips.push(r); }
+  return tips.sort((a, b) => log.indexOf(rootOf(a)) - log.indexOf(rootOf(b)));
+}
+// the whole edit chain ending at `tip`, oldest -> tip
+function chainOf(tip: string): string[] {
+  const out = [tip];
+  for (let cur = prevOf(tip); cur; cur = prevOf(cur)) out.unshift(cur);
   return out;
 }
 
 function addEntry(emp: string, date: string, proj: string, hours: string): void {
   const rec = [emp, date, proj, hours].join("|");
-  for (const f of FIELDS) g.node(rec).apply(f);               // chop the record's fields
-  const dateNode = g.node(rec).apply("date");                 // chop the date deeper
-  for (const f of ["year", "month", "day"]) dateNode.apply(f);
-
-  // if the cell already has a current observation, the new one supersedes it
-  const existing = log.filter(r => cellKey(r) === cellKey(rec));
-  const oldTip = tipOf(existing);
-  if (oldTip && oldTip !== rec) g.node(oldTip).apply("supersedes", rec); // <- order as an edge
-
-  log.push(rec);
+  chop(rec);
+  log.push(rec);                                         // a new chain root — no edit edge
   renderData(g, DATA);
-  console.log(`  logged: ${emp} ${date} ${proj} ${hours}h${oldTip ? "   (supersedes " + field(oldTip, "hours") + "h)" : ""}`);
+  console.log(`  added: ${emp} ${date} ${proj} ${hours}h`);
+}
+
+// edit an ENTIRE row into an entire edited row. The old row must be a CURRENT
+// entry (you correct what's live, not a stale version); the new row is anything.
+function editRow(oldRec: string, newRec: string): void {
+  if (!currentEntries().includes(oldRec)) {
+    console.log(`  "${oldRec.replace(/\|/g, " ")}" is not a current entry (see 'list')`); return;
+  }
+  if (newRec === oldRec) { console.log("  no change"); return; }
+  chop(newRec);
+  g.node(oldRec).apply("edit", newRec);                 // draw the edit edge: old -> new
+  log.push(newRec);
+  renderData(g, DATA);
+  console.log(`  edited:  ${oldRec.replace(/\|/g, " ")}  ->  ${newRec.replace(/\|/g, " ")}`);
 }
 
 function view(): void {
   const cell = new Map<string, number>(), emps = new Set<string>(), dates = new Set<string>();
-  for (const rec of current().values()) {
-    const e = field(rec, "emp"), d = field(rec, "date");
+  for (const r of currentEntries()) {                   // auto-resolves to current tips
+    const e = field(r, "emp"), d = field(r, "date");
     emps.add(e); dates.add(d);
-    cell.set(`${e}|${d}`, (cell.get(`${e}|${d}`) ?? 0) + Number(field(rec, "hours")));
+    cell.set(`${e}|${d}`, (cell.get(`${e}|${d}`) ?? 0) + Number(field(r, "hours")));
   }
   const E = [...emps].sort(), D = [...dates].sort();
   if (!E.length) { console.log("  (no entries yet — try: add bob 2026-08-25 projX 8)"); return; }
@@ -110,48 +126,54 @@ function view(): void {
 }
 
 function list(): void {
-  const cur = current();
-  if (!cur.size) { console.log("  (empty)"); return; }
-  for (const [key, rec] of cur) console.log(`  ${key.replace(/\|/g, "  ")}  ->  ${field(rec, "hours")}h`);
+  const cur = currentEntries();
+  if (!cur.length) { console.log("  (empty)"); return; }
+  cur.forEach((r, i) => console.log(`  [${i}]  ${r.replace(/\|/g, "  ")}`));
 }
 
-function history(emp: string, date: string, proj: string): void {
-  const key = `${emp}|${date}|${proj}`;
-  const recs = log.filter(r => cellKey(r) === key);
-  if (!recs.length) { console.log("  (no entries for that cell)"); return; }
-  const chain = chainOf(recs);
-  console.log(`  ${key.replace(/\|/g, "  ")} — ${chain.length} observation(s), oldest first:`);
-  console.log("     " + chain.map((r, i) =>
-    `${field(r, "hours")}h${i === chain.length - 1 ? " (current)" : ""}`).join("  ->  "));
+function history(idx: number): void {
+  const tip = currentEntries()[idx];
+  if (tip === undefined) { console.log(`  no current entry #${idx}`); return; }
+  const ch = chainOf(tip);
+  console.log(`  entry #${idx} — ${ch.length} version(s), oldest first:`);
+  ch.forEach((r, i) =>
+    console.log(`     ${i === ch.length - 1 ? "* " : "  "}${r.replace(/\|/g, "  ")}${i === ch.length - 1 ? "   (current)" : ""}`));
 }
 
 function openBrowser(): void {
   renderData(g, DATA);
   execFile("xdg-open", [HTML], err => { if (err) console.log(`  (open ${HTML} yourself)`); });
-  console.log(`  opened ${HTML} — reload after each 'add'`);
+  console.log(`  opened ${HTML} — reload after each add/edit`);
 }
 
 const HELP = `commands:
-  add <emp> <date> <proj> <hours>   log time (edit = add again for the same cell)
-  view                              grid: employee x date, current hours/day
-  list                              every current cell (emp date proj -> hours)
-  history <emp> <date> <proj>       the supersedes chain, oldest -> current
-  log                               the raw append log (order is in edges, not here)
-  open                              open graph.html
-  help / quit`;
+  add <emp> <date> <proj> <hours>                        start a NEW entry
+  edit <emp date proj hours> -> <emp date proj hours>    edit a whole row into an edited row
+  list                                                   current entries (copy a row to edit it)
+  view                                                   grid: employee x date, current hours/day
+  history <#>                                            the edit chain of entry #<#>
+  log                                                    every record ever (order lives in edges)
+  open / help / quit`;
 
 function handle(line: string): void {
-  const [cmd, ...args] = line.split(/\s+/).filter(Boolean);
+  const [cmd, ...a] = line.split(/\s+/).filter(Boolean);
   switch (cmd) {
     case undefined: return;
     case "add":
-      if (args.length !== 4) { console.log("  usage: add <emp> <date> <proj> <hours>"); return; }
-      addEntry(args[0], args[1], args[2], args[3]); return;
-    case "view": view(); return;
+      if (a.length !== 4) { console.log("  usage: add <emp> <date> <proj> <hours>"); return; }
+      addEntry(a[0], a[1], a[2], a[3]); return;
+    case "edit": {
+      const i = a.indexOf("->");                        // split old row  ->  new row
+      if (i !== 4 || a.length !== 9) {
+        console.log("  usage: edit <emp date proj hours> -> <emp date proj hours>"); return;
+      }
+      editRow(a.slice(0, 4).join("|"), a.slice(5).join("|")); return;
+    }
     case "list": list(); return;
+    case "view": view(); return;
     case "history":
-      if (args.length !== 3) { console.log("  usage: history <emp> <date> <proj>"); return; }
-      history(args[0], args[1], args[2]); return;
+      if (a.length !== 1) { console.log("  usage: history <#>"); return; }
+      history(+a[0]); return;
     case "log":
       if (!log.length) { console.log("  (empty)"); return; }
       log.forEach((r, i) => console.log(`  #${i + 1}  ${r.replace(/\|/g, "  ")}`)); return;
@@ -162,15 +184,15 @@ function handle(line: string): void {
   }
 }
 
-// seed some entries (your values — note the 11/12 hours that collide with months)
+// seed some entries (your values — the 11/12 hours still collide with months)
 addEntry("bob",   "2026-08-25", "projX", "8");
 addEntry("bob",   "2026-08-25", "projY", "12");
 addEntry("alice", "2026-11-25", "projX", "11");
 addEntry("bob",   "2026-12-26", "projX", "4");
 addEntry("carol", "2026-08-26", "projY", "7");
 addEntry("alice", "2026-08-26", "projX", "12");
-console.log("\ninteractive timesheet — 'help', 'view', 'open'. correct bob and watch:");
-console.log("  add bob 2026-08-25 projX 6   then   history bob 2026-08-25 projX\n");
+console.log("\ntimesheet — 'add' starts an entry; edit a whole row into an edited row:");
+console.log("try:  edit bob 2026-08-25 projX 8 -> bob 2026-08-25 projZ 6\n");
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: "timesheet> " });
 rl.prompt();
