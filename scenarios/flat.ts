@@ -1,6 +1,6 @@
 // play-flat.ts — functions calling functions (NESTED but FLAT), plus the
 // NOTHING / skip mechanic.
-//   npx tsx ReversibleFunctionGraph2/scenarios/flat.ts
+//   npx tsx scenarios/flat.ts
 //
 // Two things shown together:
 //  1) FLAT: a function body uses another via g.apply(...). The inner call traces

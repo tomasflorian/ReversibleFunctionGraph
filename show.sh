@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
 # show.sh <scenario> — run a scenario (regenerating data.js) then open the viewer.
-# Works from anywhere: runs from the repo root so relative imports resolve.
+# Works from anywhere: runs from the project directory so relative imports resolve.
 #
-#   ./ReversibleFunctionGraph2/show.sh path      # names / CSV / endpoints
-#   ./ReversibleFunctionGraph2/show.sh dense     # anagram + IP parsing
+#   ./show.sh path      # names / CSV / endpoints
+#   ./show.sh dense     # anagram + IP parsing
 #
 # With no argument (or an unknown one), lists the available scenarios.
 # If a graph.html tab is already open, reload it after the run instead.
 set -e
 
-here="$(cd "$(dirname "$0")" && pwd)" # ReversibleFunctionGraph2/
-root="$(dirname "$here")"             # repo root (parent of this folder)
-cd "$root"
+here="$(cd "$(dirname "$0")" && pwd)"
+cd "$here"
 
 list() {
   echo "scenarios:"
@@ -22,9 +21,9 @@ list() {
 }
 
 name="${1:-}"
-rel="ReversibleFunctionGraph2/scenarios/$name.ts"
+rel="scenarios/$name.ts"
 
-if [ -z "$name" ] || [ ! -f "$root/$rel" ]; then
+if [ -z "$name" ] || [ ! -f "$here/$rel" ]; then
   [ -n "$name" ] && echo "unknown scenario: $name" >&2
   echo "usage: $(basename "$0") <scenario>" >&2
   list >&2
@@ -32,4 +31,4 @@ if [ -z "$name" ] || [ ! -f "$root/$rel" ]; then
 fi
 
 npx tsx "$rel"
-xdg-open ReversibleFunctionGraph2/graph.html
+xdg-open "$here/graph.html"

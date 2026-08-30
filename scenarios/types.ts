@@ -1,5 +1,5 @@
 // play-types.ts — types are not declared, they are DISCOVERED.
-//   npx tsx ReversibleFunctionGraph2/scenarios/types.ts
+//   npx tsx scenarios/types.ts
 //
 // A "type" here is just the extension of a predicate: the set of values it
 // accepts. Each predicate is identity-on-success (returns the value) and silent

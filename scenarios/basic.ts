@@ -1,6 +1,6 @@
 // play.ts — a tiny demo of RFG2. Run it, edit it, watch it re-run:
-//   npx tsx ReversibleFunctionGraph2/scenarios/basic.ts
-//   npx tsx watch ReversibleFunctionGraph2/scenarios/basic.ts
+//   npx tsx scenarios/basic.ts
+//   npx tsx watch scenarios/basic.ts
 //
 // This is v1's play.ts translated into v2's model. FORWARD apply is identical.
 // Two honest differences, flagged inline where they bite:
@@ -61,5 +61,5 @@ g.node("length()").to().log("length used in =");  // [length(paris), length(toky
 for (const w of ["lima", "bat", "cat", "arc"]) g.node(w).apply("cut").log("cut =");
 // g.digest();  // <- not yet in v2
 
-// write the graph data (open ReversibleFunctionGraph2/graph.html, reload after runs)
+// write the graph data (open graph.html, reload after runs)
 renderData(g);

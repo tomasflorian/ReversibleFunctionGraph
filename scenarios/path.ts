@@ -1,5 +1,5 @@
 // play-path.ts — two ways to ingest people, and why they DON'T converge.
-//   npx tsx ReversibleFunctionGraph2/scenarios/path.ts
+//   npx tsx scenarios/path.ts
 //
 // Method 1 (old): I hardcode firstName/lastName and apply them. The field lands
 //   under firstName() because *I* named it that.

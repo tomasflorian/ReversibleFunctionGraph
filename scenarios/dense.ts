@@ -1,5 +1,5 @@
 // play-dense.ts — pack the graph as DENSE as possible with representative ops.
-//   npx tsx ReversibleFunctionGraph2/scenarios/dense.ts
+//   npx tsx scenarios/dense.ts
 //
 // Density in this model = COLLAPSE + REUSE. Every distinct string is one node, so
 // the way to make the graph dense (many edges, few nodes) is to choose inputs and

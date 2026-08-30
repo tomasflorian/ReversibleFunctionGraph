@@ -1,5 +1,5 @@
 // timesheet-cli.ts — INTERACTIVE console timesheet on the ergo window.
-//   npx tsx ReversibleFunctionGraph2/scenarios/timesheet-cli.ts
+//   npx tsx scenarios/timesheet-cli.ts
 //
 // Nodes are shown RAW (pipe-delimited) everywhere, so you can copy a line from
 // `list`/`log` straight into `edit`. `edit` is fully generic: edit <old> -> <new>
@@ -19,9 +19,10 @@ import { ergo } from "../ergo.ts";
 import { renderData } from "../viz.ts";
 import * as readline from "node:readline";
 import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-const DATA = "ReversibleFunctionGraph2/data.js";
-const HTML = "ReversibleFunctionGraph2/graph.html";
+const DATA = new URL("../data.js", import.meta.url);
+const HTML = fileURLToPath(new URL("../graph.html", import.meta.url));
 
 const g = new Graph();
 const e = ergo(g);

@@ -4,15 +4,14 @@
 # randomness), so it is a diffable snapshot: refactor freely, re-run this, and
 # `git diff dataAll.log` shows whether any behaviour actually changed.
 #
-#   ./ReversibleFunctionGraph2/runAll.sh
+#   ./runAll.sh
 #
 # (The interactive CLIs are fed a fixed command script so their output is stable.)
 
-here="$(cd "$(dirname "$0")" && pwd)" # ReversibleFunctionGraph2/
-root="$(dirname "$here")"             # repo root
-cd "$root"
+here="$(cd "$(dirname "$0")" && pwd)"
+cd "$here"
 
-LOG="ReversibleFunctionGraph2/dataAll.log"
+LOG="dataAll.log"
 : > "$LOG"
 
 banner() {
@@ -28,7 +27,7 @@ banner() {
 # ---- batch scenarios (print and exit) --------------------------------------
 for s in basic dense flat types path; do
   banner "scenario: $s"
-  npx tsx "ReversibleFunctionGraph2/scenarios/$s.ts" >> "$LOG" 2>&1 \
+  npx tsx "scenarios/$s.ts" >> "$LOG" 2>&1 \
     || echo "  [exited non-zero]" >> "$LOG"
 done
 
@@ -41,14 +40,14 @@ run_cli() {
     || echo "  [exited non-zero]" >> "$LOG"
 }
 
-run_cli "general (scripted)" "ReversibleFunctionGraph2/general.ts" \
+run_cli "general (scripted)" "general.ts" \
 "tables
 sources
 drop 0
 tables
 quit"
 
-run_cli "timesheet-cli (scripted)" "ReversibleFunctionGraph2/scenarios/timesheet-cli.ts" \
+run_cli "timesheet-cli (scripted)" "scenarios/timesheet-cli.ts" \
 "list
 view
 log

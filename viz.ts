@@ -2,9 +2,9 @@
 // draw. viz generates DATA only; graph.html is a hand-written shell you keep.
 //
 //   import { renderData } from "./viz.ts";
-//   renderData(g);                     // writes ReversibleFunctionGraph2/data.js
+//   renderData(g);                     // writes data.js beside this module
 //
-// then open ReversibleFunctionGraph2/graph.html in a browser (reload after runs).
+// then open graph.html in a browser (reload after runs).
 //
 // The one v2 twist: edges are UNLABELED, so meaning shows through node ROLE
 // instead. Each node gets a role read from its string — the shell colors by it,
@@ -24,14 +24,15 @@ function displayRole(value: string, role: "value" | "application"): "value" | "f
 }
 
 // Snapshot the graph and write it as data.js, which sets window.GRAPH.
-function renderData(g: Graph, path = "ReversibleFunctionGraph2/data.js"): void {
+function renderData(g: Graph, path: string | URL = new URL("./data.js", import.meta.url)): void {
   const { nodes, edges } = g.snapshot();
   const graph = {
     nodes: nodes.map(n => ({ id: n.value, label: n.value, role: displayRole(n.value, n.role) })),
     edges: edges.map(e => ({ from: e.from, to: e.to })), // unlabeled: direction only
   };
   writeFileSync(path, `window.GRAPH = ${JSON.stringify(graph)};\n`);
-  console.log(`rendered ${nodes.length} nodes, ${edges.length} edges -> ${path}`);
+  const shownPath = path instanceof URL ? "data.js" : path;
+  console.log(`rendered ${nodes.length} nodes, ${edges.length} edges -> ${shownPath}`);
 }
 
 export { renderData };

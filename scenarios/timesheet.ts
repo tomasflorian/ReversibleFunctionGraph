@@ -1,6 +1,6 @@
 // timesheet.ts — a real app on the graph: enter entries, "edit" by APPENDING,
 // and read the current view as a LATEST-WINS query.
-//   ./ReversibleFunctionGraph2/show.sh timesheet
+//   ./show.sh timesheet
 //
 // The point: there is no mutable cell. An entry is a record; an EDIT is a new
 // record with a later seq; the "current" value is a QUERY (max seq per cell).

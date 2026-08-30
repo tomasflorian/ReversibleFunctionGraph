@@ -15,13 +15,13 @@ cut = l|i|m|a
 cut = b|a|t
 cut = c|a|t
 cut = a|r|c
-rendered 35 nodes, 36 edges -> ReversibleFunctionGraph2/data.js
+rendered 35 nodes, 36 edges -> data.js
 
 ════════════════════════════════════════════════════════════════════════
   scenario: dense
 ════════════════════════════════════════════════════════════════════════
 
-rendered 148 nodes, 338 edges -> ReversibleFunctionGraph2/data.js
+rendered 148 nodes, 338 edges -> data.js
 
 === biggest hubs (reverse = who produced this) ===
 length -> "3"     produced by = [lastOctetFromIP(192.168.1.3), length(cat), length(act), length(arc), length(car), length(tar), length(rat), length(art), length(CAT), length(ACT), length(ARC), length(CAR), length(TAR), length(RAT), length(ART)]
@@ -64,7 +64,7 @@ after re-running the BAD input (not memoized, guard re-fires):
 === FLAT still holds: an inner call is a sibling, not a child ===
 octetSum = 15
 octetSum inputs = [octetSum(), 10.0.0.5]
-rendered 13 nodes, 12 edges -> ReversibleFunctionGraph2/data.js
+rendered 13 nodes, 12 edges -> data.js
 
 ════════════════════════════════════════════════════════════════════════
   scenario: types
@@ -87,13 +87,13 @@ rendered 13 nodes, 12 edges -> ReversibleFunctionGraph2/data.js
 === NO TYPE yet — until you ask ===
   mystery-blob → []   (nobody asked)
   mystery-blob → [ 'isString' ]   (after asking: just a string)
-rendered 31 nodes, 48 edges -> ReversibleFunctionGraph2/data.js
+rendered 31 nodes, 48 edges -> data.js
 
 ════════════════════════════════════════════════════════════════════════
   scenario: path
 ════════════════════════════════════════════════════════════════════════
 
-rendered 56 nodes, 65 edges -> ReversibleFunctionGraph2/data.js
+rendered 56 nodes, 65 edges -> data.js
 
 ════════════════════════════════════════════════════════════════════════
   general (scripted)
@@ -107,7 +107,7 @@ tables
 quit
 
 ── output ──
-rendered 35 nodes, 36 edges -> ReversibleFunctionGraph2/data.js
+rendered 35 nodes, 36 edges -> data.js
 
 general loader — try:  tables   then   sources   then   drop 0   then   tables
 
@@ -133,7 +133,7 @@ general>   3 table(s) reconstructed from the graph:
 general>   [0] csv  first,last;alice,jones;bob,smith
   [1] json  [{"first":"carol","last":"white"},{"first":"dave","last":"green"}]
   [2] json  [{"ip":"10.0.0.1","geo":{"city":"paris","country":"fr"}}]
-general> rendered 25 nodes, 24 edges -> ReversibleFunctionGraph2/data.js
+general> rendered 25 nodes, 24 edges -> data.js
   dropped source 0, rebuilt
 general>   3 table(s) reconstructed from the graph:
 
@@ -165,17 +165,17 @@ log
 quit
 
 ── output ──
-rendered 22 nodes, 21 edges -> ReversibleFunctionGraph2/data.js
+rendered 22 nodes, 21 edges -> data.js
   added: bob|2026-08-25|projX|8
-rendered 29 nodes, 33 edges -> ReversibleFunctionGraph2/data.js
+rendered 29 nodes, 33 edges -> data.js
   added: bob|2026-08-25|projY|12
-rendered 40 nodes, 54 edges -> ReversibleFunctionGraph2/data.js
+rendered 40 nodes, 54 edges -> data.js
   added: alice|2026-11-25|projX|11
-rendered 51 nodes, 75 edges -> ReversibleFunctionGraph2/data.js
+rendered 51 nodes, 75 edges -> data.js
   added: bob|2026-12-26|projX|4
-rendered 62 nodes, 96 edges -> ReversibleFunctionGraph2/data.js
+rendered 62 nodes, 96 edges -> data.js
   added: carol|2026-08-26|projY|7
-rendered 67 nodes, 108 edges -> ReversibleFunctionGraph2/data.js
+rendered 67 nodes, 108 edges -> data.js
   added: alice|2026-08-26|projX|12
 
 timesheet — copy a raw row from `list` and edit it (any part):
