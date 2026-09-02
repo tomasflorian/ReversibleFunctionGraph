@@ -3,7 +3,7 @@
 // This is the whole engine: one node per distinct string (dedup), one operation
 // (apply) that computes a function, reifies the call as a node, memoizes it, and
 // wires unlabeled value↔application edges. Everything else in the project —
-// Tree navigation, snapshot, display, and the whole ergo/general/scenario stack
+// Tree navigation, the view, relations, shapes, and the whole general/scenario stack
 // — is a LAYER built on just this. If the core is right, it never has to change.
 //
 // The two GUARDS (role + bipartite) live here on purpose: they can't be peeled

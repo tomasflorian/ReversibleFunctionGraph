@@ -1,4 +1,4 @@
-// play-path.ts — two ways to ingest people, and why they DON'T converge.
+// path.ts — two ways to ingest people. The NAMES stay apart; the VALUES fuse.
 //   npx tsx scenarios/path.ts
 //
 // Method 1 (old): I hardcode firstName/lastName and apply them. The field lands
@@ -7,10 +7,21 @@
 //   data rows, then cells — and the COLUMN NAMES COME FROM THE HEADER (data).
 //   So a header of "first,last" makes the fields land under first()/last().
 //
-// firstName() and first() are different nodes, so the two methods do NOT merge.
-// That's correct: nothing says "first" means "firstName". If the CSV header had
-// said "firstName", they'd converge — but the DATA decides that, not the code.
-// Non-convergence is the same mechanism as any two non-colliding strings.
+// The FUNCTIONS do not merge: firstName() and first() are different nodes, so
+// the two methods stay two columns. Nothing says "first" means "firstName" — if
+// the CSV header had said "firstName" they would share a column, but the DATA
+// decides that, not the code.
+//
+// The VALUES merge completely, and that is the point of the picture:
+//     who produced "robert"?
+//         [firstName(robert smith), firstName(smith, robert), first(robert,smith)]
+// Three routes in — two spellings of a name and a row of a CSV file — one node.
+// No schema, no key, no join declared: dedup did entity resolution for free.
+//
+// So the graph is ONE island holding THREE tables ([firstName|lastName],
+// [first|last], [headerLine|dataRow]) plus a second island for ip/port that
+// touches nothing. Islands are not tables: an island means values are SHARED,
+// a table means shapes MATCH. Two tables inside one island IS the join.
 
 import { Graph, NOTHING } from "../graph.ts";
 import { renderData } from "../view.ts";

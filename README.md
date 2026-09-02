@@ -95,9 +95,10 @@ byte-identical.** Anything that fails that test belongs in the kernel.
 | file | role |
 |---|---|
 | `kernel.ts` | The whole engine — node, `apply`, edges, dedup, memoization, and the two guards. If this is right, it rarely changes. |
-| `graph.ts` | Ergonomic layer: `Tree` navigation (`from`/`to`), display (`log`/`toString`), `snapshot()`. Re-exports the same API. |
-| `ergo.ts` | A thin window for app code: `follow`/`back` named relations, `record` shapes, `versioned` edit-chains. Reads relations from **structure**, never by parsing call strings. |
-| `viz.ts` | Writes `data.js` for the viewer. Data only — the HTML shell is hand-written. |
+| `graph.ts` | Navigation: `Tree` walking (`from`/`to`/`nodes`/`values`), `outputsOf`, and the console display that makes it readable (`log`/`toString`). Re-exports the same API. |
+| `view.ts` | How you look at it: `snapshot()` of the whole graph, written to `data.js` for the viewer. Data only — the HTML shell is hand-written. |
+| `relate.ts` | Reads named relations off the edges — `follow`/`back`. Reads relations from **structure**, never by parsing call strings. Creates nothing. |
+| `shapes.ts` | Declares what a string *is*: `record` field-shapes, `versioned` edit-chains. Unlike `relate.ts`, these call `g.def` — they write. |
 
 The two guards live in the kernel on purpose: `apply` is what assigns the roles
 they check, so they can't be peeled off without weakening them.
@@ -115,12 +116,12 @@ they check, so they can't be peeled off without weakening them.
 | scenario | shows |
 |---|---|
 | `basic` | The core moves — forward apply, chaining, reverse walks, function addressability. |
-| `dense` | Collapse and reuse. An anagram family makes results land on the same nodes, so the graph gets many edges over few nodes. |
+| `dense` | Two experiments: an anagram family packed as dense as possible (no dead ends at all), then a foreign IP record bolted on to spoil it — which stays sparse, yet still fuses at `"3"`. |
 | `flat` | Functions calling functions — nested but flat — plus `NOTHING`, with counters proving memoization and that downstream never runs on a failed value. |
 | `types` | Types are discovered, not declared: a type is the extension of a predicate, readable both ways (value → its types, type → its members). |
-| `path` | Two ingestion methods that *don't* converge, and why that's correct — the data names the fields, not the code. |
+| `path` | Two ingestion methods. The *function names* stay separate (`firstName()` ≠ `first()`), but the **values converge**: `"robert smith"`, `"smith, robert"` and a CSV row all land on the same `robert` node. Three tables, one island. |
 | `timesheet` | A real app: no mutable cell. An edit is an append; "current" is a latest-wins query; history stays walkable. |
-| `timesheet-cli` | The same, interactive, built on `ergo.ts`. Edit chains instead of sequence numbers. |
+| `timesheet-cli` | The same, interactive, built on `shapes.ts`. Edit chains instead of sequence numbers. |
 
 Two interactive CLIs:
 
@@ -141,7 +142,7 @@ signal to pass impls a context instead.
 
 ## The viewer
 
-`viz.ts` writes `data.js`; `graph.html` is a stable hand-written shell that reads
+`view.ts` writes `data.js`; `graph.html` is a stable hand-written shell that reads
 it. Open it after a run, or reload an already-open tab.
 
 - Nodes are colored by role — value, function, application — so the reification
@@ -165,9 +166,10 @@ fixed command script. So it's a diffable snapshot: refactor freely, re-run, and
 
 ```
 kernel.ts        the engine
-graph.ts         ergonomic layer (Tree, display, snapshot)
-ergo.ts          app-facing window (relations, records, versioning)
-viz.ts           snapshot -> data.js
+graph.ts         navigation (Tree, display)
+view.ts          snapshot -> data.js
+relate.ts        reads named relations off edges
+shapes.ts        declares records and edit-chains
 graph.html       viewer shell (reads data.js)
 general.ts       generic JSON/CSV loader CLI
 scenarios/       runnable demos
