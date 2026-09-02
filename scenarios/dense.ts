@@ -1,10 +1,13 @@
-// play-dense.ts — pack the graph as DENSE as possible with representative ops.
+// dense.ts — how dense can this graph get, and what happens when you spoil it?
 //   npx tsx scenarios/dense.ts
 //
-// Density in this model = COLLAPSE + REUSE. Every distinct string is one node, so
-// the way to make the graph dense (many edges, few nodes) is to choose inputs and
-// functions whose results keep landing on the SAME node. The richest source is an
-// ANAGRAM FAMILY — words built from one small letter set — because then:
+// TWO EXPERIMENTS in one graph.
+//
+// 1) MAXIMUM DENSITY. Density in this model = COLLAPSE + REUSE. Every distinct
+// string is one node, so the way to make the graph dense (many edges, few nodes)
+// is to choose inputs and functions whose results keep landing on the SAME node.
+// The richest source is an ANAGRAM FAMILY — words built from one small letter
+// set — because then:
 //   • length()  collapses every word to one int hub          (all len 3 -> "3")
 //   • first()/last() collapse to a handful of shared letters  (hubs: a c r t)
 //   • sort()    is an anagram signature: cat,act -> "act"; tar,rat,art -> "art"
@@ -12,6 +15,26 @@
 //   • hasLetter(word, "a") makes a huge true/false hub, and reuses the very same
 //     letter nodes that first()/last() PRODUCE — so "a" is both an output hub and
 //     an input hub at once (the densest thing the model can express).
+// On its own that family has no dead ends at all: every value it produces is
+// either produced again by another route, or feeds something else.
+//
+// 2) NOW SPOIL IT. Bolt on a record that shares nothing with the family — an IP
+// with a subnet, chopped by long single-purpose functions — and see what the
+// graph does with a stranger. Most of it stays sparse, exactly as it should:
+// each parse function is used exactly once, and "IP" and "24" are dead ends that
+// nothing ever touches again. That is what sparse LOOKS like sitting next to
+// dense, in the same picture.
+//
+// But it does NOT stay separate. lastOctetFromIP(192.168.1.3) -> "3", which is
+// already the length hub for all seven words — look at the hub report and it is
+// the first thing listed. No shared schema, no declared join, no coordination of
+// any kind: the model cannot tell a word's length from an IP's last octet, so
+// they are one node.
+//
+// Semantically that is absurd, and it is left that way on purpose. The engine's
+// refusal to know what things MEAN is exactly what produces the join for free.
+// Telling those two "3"s apart is a later problem, and it belongs in a layer
+// above the engine, not inside it.
 
 import { Graph } from "../graph.ts";
 import { renderData } from "../view.ts";
@@ -68,7 +91,7 @@ renderData(g);
 // ---- HUB REPORT: show the collapses as reverse walks over shared nodes ----
 
 console.log("\n=== biggest hubs (reverse = who produced this) ===");
-g.node("3").from().log('length -> "3"     produced by =');    // all 7 words' length calls
+g.node("3").from().log('"3"               produced by =');    // 7 lengths — AND the IP's last octet
 g.node("true").from().log('hasLetter true    produced by =').values.length;
 g.node("art").from().log('sort -> "art"     produced by =');  // tar, rat, art collapse here
 

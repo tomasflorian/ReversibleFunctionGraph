@@ -24,7 +24,7 @@ rendered 35 nodes, 36 edges -> data.js
 rendered 148 nodes, 338 edges -> data.js
 
 === biggest hubs (reverse = who produced this) ===
-length -> "3"     produced by = [lastOctetFromIP(192.168.1.3), length(cat), length(act), length(arc), length(car), length(tar), length(rat), length(art), length(CAT), length(ACT), length(ARC), length(CAR), length(TAR), length(RAT), length(ART)]
+"3"               produced by = [lastOctetFromIP(192.168.1.3), length(cat), length(act), length(arc), length(car), length(tar), length(rat), length(art), length(CAT), length(ACT), length(ARC), length(CAR), length(TAR), length(RAT), length(ART)]
 hasLetter true    produced by = [hasLetter(cat,a), hasLetter(cat,c), hasLetter(cat,t), hasLetter(act,a), hasLetter(act,c), hasLetter(act,t), hasLetter(arc,a), hasLetter(arc,c), hasLetter(arc,r), hasLetter(car,a), hasLetter(car,c), hasLetter(car,r), hasLetter(tar,a), hasLetter(tar,r), hasLetter(tar,t), hasLetter(rat,a), hasLetter(rat,r), hasLetter(rat,t), hasLetter(art,a), hasLetter(art,r), hasLetter(art,t)]
 sort -> "art"     produced by = [sort(tar), sort(rat), sort(art), sort(tra)]
 
