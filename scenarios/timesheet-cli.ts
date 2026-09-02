@@ -1,22 +1,3 @@
-// timesheet-cli.ts — INTERACTIVE console timesheet on the shapes vocabulary.
-//
-// SPEAKS: shapes.ts (record + versioned) over graph.ts — the most app-level
-// thing here, and the only file that never touches a node by hand.
-//   npx tsx scenarios/timesheet-cli.ts
-//
-// Nodes are shown RAW (pipe-delimited) everywhere, so you can copy a line from
-// `list`/`log` straight into `edit`. `edit` is fully generic: edit <old> -> <new>
-// for ANY two strings — a whole row, a single value, anything. It just draws the
-// edit edge; it knows nothing about schema. Views resolve by walking edits from
-// each log root to its current tip, so an edit updates the view with no fuss.
-//
-//   add <emp> <date> <proj> <hours>        start a NEW entry (a root)
-//   edit <old> -> <new>                    edit any raw string into any raw string
-//   history <node>                         the edit chain through a raw node
-//   list                                   current entries, raw (copy one to edit it)
-//   view                                   grid: employee x date, current hours/day
-//   log / open / help / quit
-
 import { Graph } from "../graph.ts";
 import { shapes } from "../shapes.ts";
 import { renderData } from "../view.ts";
@@ -35,9 +16,8 @@ const Entry = shape.record("|", ["emp", "date", "proj", "hours"]);
 const Day   = shape.record("-", ["year", "month", "day"], isDate);
 const edit  = shape.versioned("edit");
 
-const log: string[] = []; // the roots we've added (chain starts)
+const log: string[] = [];
 
-// current entries = for each root, its current tip (walk edits forward)
 function current(): string[] {
   const seen = new Set<string>(), roots: string[] = [];
   for (const r of log) if (edit.prev(r) === null && !seen.has(r)) { seen.add(r); roots.push(r); }
@@ -46,13 +26,12 @@ function current(): string[] {
 
 function addEntry(emp: string, date: string, proj: string, hours: string): void {
   const rec = Entry.make(emp, date, proj, hours);
-  Entry.chop(rec); Day.chop(Entry.read(rec, "date"));   // eager-chop a new root
+  Entry.chop(rec); Day.chop(Entry.read(rec, "date"));
   log.push(rec);
   renderData(g, DATA);
   console.log(`  added: ${rec}`);
 }
 
-// GENERIC edit — any raw string into any raw string. Just draws the edge.
 function editAny(oldRaw: string, newRaw: string): void {
   if (oldRaw === newRaw) { console.log("  no change"); return; }
   edit.apply(oldRaw, newRaw);
@@ -81,7 +60,7 @@ function view(): void {
 function list(): void {
   const cur = current();
   if (!cur.length) { console.log("  (empty)"); return; }
-  cur.forEach(r => console.log("  " + r));            // RAW — copy one into `edit`
+  cur.forEach(r => console.log("  " + r));
 }
 
 function history(node: string): void {
@@ -115,7 +94,7 @@ function handle(line: string): void {
       addEntry(a[0], a[1], a[2], a[3]); return;
     case "edit": {
       const body = trimmed.replace(/^edit\s+/, "");
-      const parts = body.split(" -> ");                // raw old  ->  raw new (verbatim)
+      const parts = body.split(" -> ");
       if (parts.length !== 2 || !parts[0] || !parts[1]) {
         console.log("  usage: edit <old> -> <new>   (raw strings, e.g. from `list`)"); return;
       }
@@ -138,7 +117,6 @@ function handle(line: string): void {
   }
 }
 
-// seed some entries (your values — 11/12 hours still collide with months)
 addEntry("bob",   "2026-08-25", "projX", "8");
 addEntry("bob",   "2026-08-25", "projY", "12");
 addEntry("alice", "2026-11-25", "projX", "11");

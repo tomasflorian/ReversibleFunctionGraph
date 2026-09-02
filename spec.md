@@ -25,7 +25,7 @@ You can always tell which role a node plays from its **string form** and its
 Single-output is **not** enforced by a type; it's an **invariant that `apply`
 maintains** when it builds an Application.
 
-## The four guarantees
+## The guarantees
 
 - **G1 — single output.** An **Application** has exactly **one output** and
   **unlimited inputs**. (Scoped to the Application role; Values are hubs and may
@@ -37,6 +37,18 @@ maintains** when it builds an Application.
   node's **string**, not in its edges.
 - **G4 — only strings.** The one data type is `string`. A string is a number, a
   list, etc. **only through the function applied to it.**
+- **G5 — roles are read, never stored.** One `Node` class. Value and Application
+  are roles read off structure (string form + edges); never a type, never a flag,
+  never a field. `apply` maintains them; nothing records them.
+- **G6 — meaning lives in the data, not the engine.** The header names the
+  columns. A type is whatever a predicate admits. "Latest wins" is a rule the
+  reader picks. The engine knows nothing of schema, type, or time.
+- **G7 — convergence is never engineered.** Things fuse because their strings are
+  equal, never because code decided they are related. No keys, no schema, no
+  matching rules — and two things failing to converge is equally correct.
+- **G8 — reversibility is absolute.** Every recorded computation can be walked
+  backwards. Nothing may be built that produces a result you cannot get back
+  from. This is the purpose, not a feature.
 
 ## Calling: UFCS convention
 
@@ -102,71 +114,6 @@ isNumber() ──▶ isNumber(5)
   actually want to enumerate functions. Structural, not a flag. **Deferred** until
   introspection needs it.
 
-## Carried over from `graph.ts` (do not reinvent)
-
-- **dedup** (one node per string), **reverse-for-free** (both-ways edges),
-  **memoization** (same call ⇒ existing node).
-- **Ergonomics layer**: `.log()` / `.values` chaining, custom-inspect (print as
-  value), and the one-vs-many handle (`NodeList` for `from`'s many results —
-  still just a code wrapper, structural role unaffected).
-- **STRUCTURE / ERGONOMICS banner discipline**; core in `graph.ts`, display in a
-  separate `viz.ts` (litmus: does deleting it change the graph?).
-- `viz.ts` visualization + stable `graph.html` shell + `data.js` output.
-
-## API sketch
-
-```ts
-class Graph {
-  def(name: string, impl: (...args: string[]) => string): void; // register a function
-  node(value: string): Node;                                    // the one node for a value
-}
-
-interface Node {
-  readonly value: string;
-
-  // forward: fn(this, ...rest); builds the Application subgraph, returns the result Value node
-  apply(fn: string, ...rest: string[]): Node;
-
-  // navigation over UNLABELED edges:
-  from(): NodeList; // nodes pointing INTO this one  (its producers / inputs)
-  to():   NodeList; // nodes this points TO          (its outputs / consumers)
-
-  log(label?: string): this;
-}
-// NodeList: from()/to() results — .apply / .from / .to / .log / .values, over many.
-```
-
-## Sample play.ts
-
-```ts
-const g = new Graph();
-g.def("upper", s => s.toUpperCase());
-g.def("length", s => String(s.length));
-g.def("strContains", (h, n) => String(h.includes(n)));
-
-// FORWARD — apply returns the result Value; the Application node is built behind it
-g.node("paris").apply("upper").log("upper =");                   // upper = PARIS
-g.node("paris").apply("length").log("length =");                 // length = 5
-
-// MULTI-ARG (UFCS: subject is arg 0)
-g.node("paris france").apply("strContains", "france").log("has =");  // has = true
-
-// CHAINING (the result flows into the next call)
-g.node("paris").apply("upper").apply("length").log();            // 5
-
-// REVERSE — unlabeled; the Application node now sits in the path (two hops)
-g.node("5").from().log("produced 5 =");           // [length(paris)]   ← the applications
-g.node("5").from().from().log("their inputs =");  // [length(), paris] ← inputs (incl. the function)
-
-// FUNCTION ADDRESSABILITY — a function is a node; walk to every call that used it
-g.node("upper()").to().log("upper used in =");    // [upper(paris)]
-```
-
-Note the one real shift from `graph.ts`: reverse is now **two hops** (value →
-Application → inputs), because the Application is reified in between. More
-indirect, but that indirection *is* the win — the Application (and the function)
-are addressable nodes you can land on, query, and later hang metadata on.
-
 ## Decisions (resolved)
 
 - **One `Node` class; Value/Application are structural roles**, read from string
@@ -184,4 +131,15 @@ are addressable nodes you can land on, query, and later hang metadata on.
 - `function` root + function introspection.
 - **digest / enrichment**: break `|`-list Value strings into element Values via
   unlabeled edges, as a background pass.
-- forgetting, persistence, time/ordering, a surface syntax.
+- persistence, time/ordering, a surface syntax.
+
+## Known broken (implementation, not model — delete when fixed)
+
+- **Argument separator is unescaped.** `apply` keys an Application as
+  `fn(args.join(","))`, so an argument containing `,` collides with a different
+  call: `join2("a,b","c")` and `join2("a","b,c")` are one node, and the second
+  silently receives the first's memoized result.
+- **A repeated argument loses its position.** `linkTo` skips an edge that already
+  exists, so `pair(x,x)` has inputs `[pair(), x]` — arg1 is gone. Readers that
+  index inputs positionally (`relate.ts`, `scenarios/timesheet.ts`) are correct
+  only while a call's arguments are distinct.

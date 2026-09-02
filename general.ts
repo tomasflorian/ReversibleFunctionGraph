@@ -1,29 +1,3 @@
-// SPEAKS: graph.ts directly. It predates relate.ts / shapes.ts and has NOT been
-// migrated on purpose — it is aspirational and may be rewritten, so the layers
-// are deliberately not shaped around it.
-//
-// general.ts — a generic loader CLI. Ground truth is a list of RAW SOURCES
-// (JSON / CSV). Replaying them chops everything into the graph; TABLES are gazed
-// back out of the graph (never stored). Edit/delete = change a source and REBUILD
-// from ground truth — the graph is a pure function of (sources + functions).
-//   npx tsx general.ts
-//
-// There is ONE chopping path: extract-a-key from a JSON object. CSV is sugar —
-// each row becomes an object, then chops the same way. Because CSV headers and
-// JSON keys land under the SAME function name, sources MERGE when their keys
-// match and stay separate when they don't — the data decides, not a schema.
-//
-// ────────────────────────────────────────────────────────────────────────────
-// TRIPWIRE: every function here is PURE (parse/stringify/split — no g.apply
-// inside an impl). That is what makes "throw the graph away and rebuild" clean:
-// pure impls don't close over the graph, so replay against a fresh graph just
-// works. The DAY you write a COMPOSITE function (an impl that calls g.apply to
-// use another function), it will close over `g` and go stale on rebuild. That is
-// the single signal to make the ~2-line core change: have `apply` pass the impl
-// a context so impls call ctx.apply(...) instead of closing over a graph. Until
-// then: keep impls pure and this file needs no core changes.
-// ────────────────────────────────────────────────────────────────────────────
-
 import { Graph } from "./graph.ts";
 import { renderData } from "./view.ts";
 import * as readline from "node:readline";
@@ -34,28 +8,25 @@ const DATA = new URL("./data.js", import.meta.url);
 const HTML = fileURLToPath(new URL("./graph.html", import.meta.url));
 const SEP = "\u0000";
 
-// ── ground truth ────────────────────────────────────────────────────────────
 type Source = { kind: "json" | "csv"; raw: string };
 const sources: Source[] = [];
 
-// rebuilt fresh on every change:
 let g = new Graph();
-let columns = new Set<string>(); // every key/header seen — the gazes available
+let columns = new Set<string>();
 
-// ── the ONE chopping path: extract a key out of a JSON object ────────────────
 function chopObject(obj: Record<string, unknown>): void {
-  const s = JSON.stringify(obj);                       // the object's node = its JSON
+  const s = JSON.stringify(obj);
   for (const key of Object.keys(obj)) {
     const val = obj[key];
-    g.def(key, (str: string) => {                      // PURE: parse, read this key
+    g.def(key, (str: string) => {
       const v = (JSON.parse(str) as Record<string, unknown>)[key];
       return v === undefined || v === null ? null
         : typeof v === "object" ? JSON.stringify(v) : String(v);
     });
     columns.add(key);
-    g.node(s).apply(key);                              // obj ──▶ key(obj) ──▶ value
+    g.node(s).apply(key);
     if (val && typeof val === "object" && !Array.isArray(val))
-      chopObject(val as Record<string, unknown>);      // nested object → its own sub-table
+      chopObject(val as Record<string, unknown>);
     else if (Array.isArray(val))
       for (const el of val) if (el && typeof el === "object") chopObject(el as Record<string, unknown>);
   }
@@ -65,7 +36,7 @@ function loadJSON(raw: string): void {
   const data = JSON.parse(raw);
   (Array.isArray(data) ? data : [data]).forEach(chopObject);
 }
-function loadCSV(raw: string): void {                   // sugar: rows → objects → chopObject
+function loadCSV(raw: string): void {
   const lines = raw.split(/[\n;]/).map(l => l.trim()).filter(Boolean);
   if (!lines.length) return;
   const cols = lines[0].split(",").map(c => c.trim());
@@ -77,7 +48,6 @@ function loadCSV(raw: string): void {                   // sugar: rows → objec
   }
 }
 
-// ── REBUILD: the graph is a pure replay of the sources ───────────────────────
 function rebuild(): void {
   g = new Graph();
   columns = new Set();
@@ -88,13 +58,12 @@ function rebuild(): void {
   renderData(g, DATA);
 }
 
-// ── GAZE: reconstruct tables from the graph by column-signature ──────────────
 function gazeTables(): void {
   const cols = [...columns];
   const cell = new Map<string, string>(), subjects: string[] = [], seen = new Set<string>();
   for (const c of cols)
     for (const app of g.node(c + "()").to().nodes) {
-      const subject = app.from().nodes[1]?.value;   // inputs are [c(), subject]
+      const subject = app.from().nodes[1]?.value;
       if (subject === undefined) continue;
       cell.set(subject + SEP + c, app.to().nodes[0]?.value ?? "");
       if (!seen.has(subject)) { seen.add(subject); subjects.push(subject); }
@@ -153,7 +122,7 @@ function handle(line: string): void {
     case "tables": gazeTables(); return;
     case "sources": sourcesList(); return;
     case "edit": {
-      const idx = +a[0], raw = rest("edit").replace(/^\S+\s+/, "");  // "edit <#> <newraw>"
+      const idx = +a[0], raw = rest("edit").replace(/^\S+\s+/, "");
       if (!sources[idx] || !raw) return void console.log("  usage: edit <#> <newraw>");
       sources[idx].raw = raw; rebuild(); console.log(`  edited source ${idx}, rebuilt`); return;
     }
@@ -170,8 +139,6 @@ function handle(line: string): void {
   }
 }
 
-// seed: a CSV and two JSON sources — one that MERGES with the CSV (same keys),
-// one NESTED (a tree → a parent table + a sub-table).
 sources.push({ kind: "csv",  raw: "first,last;alice,jones;bob,smith" });
 sources.push({ kind: "json", raw: '[{"first":"carol","last":"white"},{"first":"dave","last":"green"}]' });
 sources.push({ kind: "json", raw: '[{"ip":"10.0.0.1","geo":{"city":"paris","country":"fr"}}]' });

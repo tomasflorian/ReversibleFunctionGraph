@@ -1,44 +1,3 @@
-// dense.ts — how dense can this graph get, and what happens when you spoil it?
-//
-// SPEAKS: graph.ts — model level on purpose. The subject is dedup itself, which
-// is only visible if you can watch raw nodes collapse onto each other.
-//   npx tsx scenarios/dense.ts
-//
-// TWO EXPERIMENTS in one graph.
-//
-// 1) MAXIMUM DENSITY. Density in this model = COLLAPSE + REUSE. Every distinct
-// string is one node, so the way to make the graph dense (many edges, few nodes)
-// is to choose inputs and functions whose results keep landing on the SAME node.
-// The richest source is an ANAGRAM FAMILY — words built from one small letter
-// set — because then:
-//   • length()  collapses every word to one int hub          (all len 3 -> "3")
-//   • first()/last() collapse to a handful of shared letters  (hubs: a c r t)
-//   • sort()    is an anagram signature: cat,act -> "act"; tar,rat,art -> "art"
-//   • reverse() sometimes lands on ANOTHER word in the set    (tar <-> rat)
-//   • hasLetter(word, "a") makes a huge true/false hub, and reuses the very same
-//     letter nodes that first()/last() PRODUCE — so "a" is both an output hub and
-//     an input hub at once (the densest thing the model can express).
-// On its own that family has no dead ends at all: every value it produces is
-// either produced again by another route, or feeds something else.
-//
-// 2) NOW SPOIL IT. Bolt on a record that shares nothing with the family — an IP
-// with a subnet, chopped by long single-purpose functions — and see what the
-// graph does with a stranger. Most of it stays sparse, exactly as it should:
-// each parse function is used exactly once, and "IP" and "24" are dead ends that
-// nothing ever touches again. That is what sparse LOOKS like sitting next to
-// dense, in the same picture.
-//
-// But it does NOT stay separate. lastOctetFromIP(192.168.1.3) -> "3", which is
-// already the length hub for all seven words — look at the hub report and it is
-// the first thing listed. No shared schema, no declared join, no coordination of
-// any kind: the model cannot tell a word's length from an IP's last octet, so
-// they are one node.
-//
-// Semantically that is absurd, and it is left that way on purpose. The engine's
-// refusal to know what things MEAN is exactly what produces the join for free.
-// Telling those two "3"s apart is a later problem, and it belongs in a layer
-// above the engine, not inside it.
-
 import { Graph } from "../graph.ts";
 import { renderData } from "../view.ts";
 
@@ -48,9 +7,9 @@ g.def("upper", s => s.toUpperCase());
 g.def("reverse", s => s.split("").reverse().join(""));
 g.def("first", s => s.charAt(0));
 g.def("last", s => s.charAt(s.length - 1));
-g.def("sort", s => s.split("").sort().join(""));            // anagram signature
+g.def("sort", s => s.split("").sort().join(""));
 g.def("vowels", s => String((s.match(/[aeiou]/g) ?? []).length));
-g.def("hasLetter", (s, c) => String(s.includes(c)));       // multi-arg (UFCS)
+g.def("hasLetter", (s, c) => String(s.includes(c)));
 g.def("parseRecordType", s=> s.split(":")[0])
 g.def("parseRecordValue", s => s.split(":")[1])
 g.def("parseIPFromIPWithSubnet", s=> s.split("/")[0]);
@@ -61,51 +20,37 @@ g.node("IP:192.168.1.3/24").apply("parseRecordType");
 g.node("IP:192.168.1.3/24").apply("parseRecordValue").apply("parseIPFromIPWithSubnet").apply("lastOctetFromIP");
 g.node("IP:192.168.1.3/24").apply("parseRecordValue").apply("parseSubnetFromIPWithSubnet");
 
-
-
-
-// The anagram family — every word is 3 letters from {a,c,r,t}. Maximum overlap.
 const words = ["cat", "act", "arc", "car", "tar", "rat", "art"];
 const battery = ["length", "upper", "reverse", "first", "last", "sort", "vowels"];
 
-// FAN-IN: every single-arg function over every word. Results collapse onto shared
-// hubs (one "3", a few letters, three anagram signatures, some reversed twins).
 for (const w of words) {
   for (const fn of battery) g.node(w).apply(fn);
 }
 
-// MULTI-ARG FAN-IN: hasLetter(word, letter) over the family's own letters. The
-// letter args ("a","c","r","t","z") are shared value nodes — and a,c,r,t are the
-// SAME nodes that first()/last() produced above. "z" gives a pure-false hub.
 for (const w of words) {
   for (const c of ["a", "c", "r", "t", "z"]) g.node(w).apply("hasLetter", c);
 }
 
-// CHAINS that collapse: reverse-then-sort == sort (same signature node), and
-// upper-then-length == length (same "3"). The second apply dedups onto an
-// existing node instead of adding a new one — depth for free, no new leaf.
 for (const w of words) {
-  g.node(w).apply("reverse").apply("sort");   // lands on the same signature as sort(w)
-  g.node(w).apply("upper").apply("length");   // lands on the same "3"
+  g.node(w).apply("reverse").apply("sort");
+  g.node(w).apply("upper").apply("length");
 }
 
 renderData(g);
 
-// ---- HUB REPORT: show the collapses as reverse walks over shared nodes ----
-
 console.log("\n=== biggest hubs (reverse = who produced this) ===");
-g.node("3").from().log('"3"               produced by =');    // 7 lengths — AND the IP's last octet
+g.node("3").from().log('"3"               produced by =');
 g.node("true").from().log('hasLetter true    produced by =').values.length;
-g.node("art").from().log('sort -> "art"     produced by =');  // tar, rat, art collapse here
+g.node("art").from().log('sort -> "art"     produced by =');
 
 console.log("\n=== the same node is BOTH an output hub and an input hub ===");
-g.node("a").from().log('"a" is PRODUCED by (first/last) =');   // first(act), first(arc), first(art)...
-g.node("a").to().log('"a" is USED BY (hasLetter args)   =');   // hasLetter(cat,a), hasLetter(act,a)...
+g.node("a").from().log('"a" is PRODUCED by (first/last) =');
+g.node("a").to().log('"a" is USED BY (hasLetter args)   =');
 
 console.log("\n=== function addressability: one hop to every call ===");
-g.node("sort()").to().log("sort() used in =");                 // every sort(word) application
+g.node("sort()").to().log("sort() used in =");
 
 console.log("\n=== chain collapse: reverse.sort lands where sort already is ===");
-const viaSort    = g.node("cat").apply("sort");                // "act"
-const viaReverse = g.node("cat").apply("reverse").apply("sort"); // also "act"
-console.log("same node?", viaSort === viaReverse, "->", viaSort.value); // true -> act
+const viaSort    = g.node("cat").apply("sort");
+const viaReverse = g.node("cat").apply("reverse").apply("sort");
+console.log("same node?", viaSort === viaReverse, "->", viaSort.value);

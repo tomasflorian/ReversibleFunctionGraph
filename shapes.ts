@@ -1,47 +1,19 @@
-// shapes.ts — WHAT SHAPE IS THIS DATA? Declaring that a string is a record with
-// fields, or that one string supersedes another.
-//
-// The difference from relate.ts: those only READ. These WRITE — each one calls
-// g.def to teach the graph functions. Saying "this is a pipe-separated record
-// with these four fields" is a claim about what the data MEANS, not a traversal.
-//
-// Still sugar, same litmus: record() builds exactly the graph you'd get writing
-// the field-chopping loop by hand, and versioned() is one g.def plus edge walks
-// borrowed from relate.ts.
-
 import { Graph } from "./graph.ts";
 import { relate } from "./relate.ts";
 
 export function shapes(g: Graph) {
   const { follow, back } = relate(g);
 
-  // A RECORD shape: teach the graph one field-function per field, and hand back
-  // make / chop / read / put. Optional guard makes fields null (→ silent) when
-  // the input isn't a valid record of this shape.
-  //
-  // NOTE THE TWO CHOPS. This one cuts BY NAME: it knows the field names, so it
-  // fans out across them. Node.chop (graph.ts) cuts BY POSITION: it knows no
-  // names, so it counts until nothing comes back. Data that carries its own
-  // names (JSON keys, a CSV header) takes the first; data that doesn't (rows,
-  // array elements, paragraphs) takes the second.
-  //
-  // The by-position SIBLING of record() does not exist yet. record() both defs
-  // the field functions and drives the cut; Node.chop only drives — you still
-  // hand-write the splitter. A `sequence(name, split)` that did both would
-  // belong here, next to this. Wait until something actually wants it.
   function record(sep: string, fields: string[], guard?: (r: string) => boolean) {
     fields.forEach((f, i) =>
       g.def(f, r => (!guard || guard(r)) ? (r.split(sep)[i] ?? null) : null));
-    const make = (...vals: string[]) => vals.join(sep);         // build the record string
+    const make = (...vals: string[]) => vals.join(sep);
     const chop = (rec: string) => { for (const f of fields) g.node(rec).apply(f); return rec; };
     const read = (rec: string, f: string) => g.node(rec).apply(f).value;
-    const put  = (...vals: string[]) => chop(make(...vals));    // make + store, returns the record
+    const put  = (...vals: string[]) => chop(make(...vals));
     return { make, chop, read, put, fields };
   }
 
-  // A VERSIONING relation `rel(old,new) -> new`: correction chains, resolved by
-  // walking edges. next/prev step one hop; tip/root go to the ends; chain lists
-  // the whole line oldest→tip; apply(old,new) draws one edit edge.
   function versioned(rel: string) {
     g.def(rel, (_old, neu) => neu);
     const next = (rec: string) => follow(rec, rel)[0] ?? null;
