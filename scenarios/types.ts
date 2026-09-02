@@ -60,11 +60,10 @@ for (const v of values) {
 // ---- read it the other way: TYPE → ITS MEMBERS ----------------------------
 // A predicate is identity-on-success, so its result IS the member. Walk the
 // predicate node → its applications → their results.  (pure navigation)
-const membersOf = (pred: string) => g.node(pred + "()").to().to().flatten().values;
 
 console.log("\n=== TYPE → its members (the extension of each predicate) ===");
 for (const p of ["isInternalIP", "isIP", "isHost", "isString"]) {
-  const m = membersOf(p);
+  const m = g.outputsOf(p);
   console.log(`  ${p.padEnd(14)} = {${m.join(", ")}}`);
 }
 // note the lattice: isInternalIP ⊂ isIP ⊂ isHost ⊂ isString, each a queryable set.

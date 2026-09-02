@@ -16,7 +16,6 @@ import { Graph, NOTHING } from "../graph.ts";
 import { renderData } from "../viz.ts";
 
 const g = new Graph();
-const membersOf = (fn: string): string[] => g.node(fn + "()").to().to().flatten().values;
 
 // ============ METHOD 1: OLD — hardcoded functions, two raw formats ==========
 g.def("firstName", s => (s.includes(",") ? s.split(", ")[1] : s.split(" ")[0]));

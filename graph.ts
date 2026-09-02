@@ -70,6 +70,10 @@ class Graph extends KGraph {
   node(value: string): Node { return super.node(value) as Node; }
   apply(fn: string, ...args: string[]): Node { return super.apply(fn, ...args) as Node; }
 
+  // Everything a function ever produced: walk fn() -> its applications -> their
+  // outputs. (The "fn()" spelling is the kernel's function-as-value node.)
+  outputsOf(fn: string): string[] { return this.node(fn + "()").to().to().flatten().values; }
+
   // A plain read-only view of the whole graph — for visualization.
   snapshot(): {
     nodes: { value: string; role: "value" | "application" }[];
