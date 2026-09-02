@@ -8,7 +8,7 @@
 // history. "Latest wins" is NOT an engine feature: seq lives in the DATA, and
 // the projection picks the max. The reader chooses the rule.
 
-import { Graph, Node, Tree } from "../graph.ts";
+import { Graph } from "../graph.ts";
 import { renderData } from "../viz.ts";
 
 const g = new Graph();
@@ -29,15 +29,14 @@ for (const rec of log)
   for (const f of ["emp", "date", "proj", "hours", "seq"]) g.node(rec).apply(f);
 
 // ---- read helpers (everything is a query over the graph) -------------------
-const nodes = (t: Tree): Node[] => t.items.filter((x): x is Node => x instanceof Node);
 const field = (rec: string, f: string) => g.node(rec).apply(f).value;
 const cellKey = (rec: string) => [field(rec, "emp"), field(rec, "date"), field(rec, "proj")].join(" | ");
 
 // discover ALL entries FROM THE GRAPH (not from `log`): emp() -> apps -> records
 function allRecords(): string[] {
   const recs: string[] = [];
-  for (const app of nodes(g.node("emp()").to()))
-    for (const inp of nodes(app.from()))
+  for (const app of g.node("emp()").to().nodes)
+    for (const inp of app.from().nodes)
       if (!inp.value.endsWith("()")) recs.push(inp.value);
   return recs;
 }
@@ -70,6 +69,6 @@ const versions = allRecords()
 console.log(`   cell "${target}" has ${versions.length} observations:`);
 for (const v of versions) console.log(`      seq ${v.seq}  ->  ${v.hours}h`);
 console.log('   the old "8" node still exists, produced by:');
-for (const app of nodes(g.node("8").from())) console.log("      " + app.value);
+for (const app of g.node("8").from().nodes) console.log("      " + app.value);
 
 renderData(g);

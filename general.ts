@@ -20,7 +20,7 @@
 // then: keep impls pure and this file needs no core changes.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { Graph, Node, Tree } from "./graph.ts";
+import { Graph } from "./graph.ts";
 import { renderData } from "./viz.ts";
 import * as readline from "node:readline";
 import { execFile } from "node:child_process";
@@ -29,8 +29,6 @@ import { fileURLToPath } from "node:url";
 const DATA = new URL("./data.js", import.meta.url);
 const HTML = fileURLToPath(new URL("./graph.html", import.meta.url));
 const SEP = "\u0000";
-
-const nodesOf = (t: Tree): Node[] => t.items.filter(x => x instanceof Node) as Node[];
 
 // ── ground truth ────────────────────────────────────────────────────────────
 type Source = { kind: "json" | "csv"; raw: string };
@@ -91,10 +89,10 @@ function gazeTables(): void {
   const cols = [...columns];
   const cell = new Map<string, string>(), subjects: string[] = [], seen = new Set<string>();
   for (const c of cols)
-    for (const app of nodesOf(g.node(c + "()").to())) {
-      const subject = nodesOf(app.from())[1]?.value;   // inputs are [c(), subject]
+    for (const app of g.node(c + "()").to().nodes) {
+      const subject = app.from().nodes[1]?.value;   // inputs are [c(), subject]
       if (subject === undefined) continue;
-      cell.set(subject + SEP + c, nodesOf(app.to())[0]?.value ?? "");
+      cell.set(subject + SEP + c, app.to().nodes[0]?.value ?? "");
       if (!seen.has(subject)) { seen.add(subject); subjects.push(subject); }
     }
   const groups = new Map<string, { cols: string[]; rows: string[] }>();

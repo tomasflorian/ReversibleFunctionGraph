@@ -12,11 +12,10 @@
 // said "firstName", they'd converge — but the DATA decides that, not the code.
 // Non-convergence is the same mechanism as any two non-colliding strings.
 
-import { Graph, Node, Tree, NOTHING } from "../graph.ts";
+import { Graph, NOTHING } from "../graph.ts";
 import { renderData } from "../viz.ts";
 
 const g = new Graph();
-const nodes = (t: Tree): Node[] => t.items.filter((x): x is Node => x instanceof Node);
 const membersOf = (fn: string): string[] => g.node(fn + "()").to().to().flatten().values;
 
 // ============ METHOD 1: OLD — hardcoded functions, two raw formats ==========

@@ -41,6 +41,9 @@ class Tree {
   }
   flatten(): Tree { return new Tree(this.leaves()); }
 
+  // Top-level Nodes only; nested Trees are dropped. (Contrast `values`, which
+  // flattens to leaves first.) One hop from one Node yields a flat Tree.
+  get nodes(): Node[] { return this.items.filter((it): it is Node => it instanceof Node); }
   get values(): string[] { return this.leaves().map(n => n.value); }
   log(label?: string): this {
     if (label === undefined) console.log(this.toString());

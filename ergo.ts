@@ -13,19 +13,17 @@
 // edges, never from the fn(args) text. That also can't be fooled by data that
 // happens to contain delimiters.
 
-import { Graph, Node, Tree } from "./graph.ts";
-
-const nodesOf = (t: Tree): Node[] => t.items.filter(x => x instanceof Node) as Node[];
+import { Graph, Node } from "./graph.ts";
 
 export function ergo(g: Graph) {
-  const inputsOf = (app: Node) => nodesOf(app.from()).map(n => n.value); // [fn(), arg0, ...]
-  const outputOf = (app: Node) => nodesOf(app.to())[0]?.value ?? null;
+  const inputsOf = (app: Node) => app.from().nodes.map(n => n.value); // [fn(), arg0, ...]
+  const outputOf = (app: Node) => app.to().nodes[0]?.value ?? null;
 
   // FOLLOW a named relation forward: from `subject`, the outputs of every
   // `rel(subject, ...)` application (subject is arg0).
   function follow(subject: string, rel: string): string[] {
     const out: string[] = [];
-    for (const app of nodesOf(g.node(subject).to())) {
+    for (const app of g.node(subject).to().nodes) {
       const ins = inputsOf(app);
       if (ins[0] === rel + "()" && ins[1] === subject) {
         const o = outputOf(app); if (o !== null) out.push(o);
@@ -37,7 +35,7 @@ export function ergo(g: Graph) {
   // that produced `node`.
   function back(node: string, rel: string): string[] {
     const out: string[] = [];
-    for (const app of nodesOf(g.node(node).from()))
+    for (const app of g.node(node).from().nodes)
       if (inputsOf(app)[0] === rel + "()") out.push(inputsOf(app)[1]);
     return out;
   }
@@ -73,5 +71,5 @@ export function ergo(g: Graph) {
     return { next, prev, tip, root, chain, apply };
   }
 
-  return { follow, back, record, versioned, nodesOf };
+  return { follow, back, record, versioned };
 }
