@@ -9,14 +9,15 @@
 // the projection picks the max. The reader chooses the rule.
 
 import { Graph } from "../graph.ts";
+import { shapes } from "../shapes.ts";
 import { renderData } from "../view.ts";
 
 const g = new Graph();
 
-// each entry is one raw record: "emp|date|project|hours|seq". Functions chop it.
+// each entry is one raw record: "emp|date|project|hours|seq". record() declares
+// that shape — it defs one field-function per field, and hands back chop/read.
 // (seq is just data — the ordering. The engine knows nothing about time.)
-for (const f of ["emp", "date", "proj", "hours", "seq"])
-  g.def(f, r => r.split("|")[["emp", "date", "proj", "hours", "seq"].indexOf(f)]);
+const Entry = shapes(g).record("|", ["emp", "date", "proj", "hours", "seq"]);
 
 // ---- THE APPEND LOG (every write, in order) --------------------------------
 const log = [
@@ -25,20 +26,20 @@ const log = [
   "bob|2026-08-26|projX|4|3",     // #3 bob logs 4h Tuesday
   "bob|2026-08-25|projX|6|4",     // #4 CORRECTION: bob's Monday was really 6h
 ];
-for (const rec of log)
-  for (const f of ["emp", "date", "proj", "hours", "seq"]) g.node(rec).apply(f);
+for (const rec of log) Entry.chop(rec);
 
 // ---- read helpers (everything is a query over the graph) -------------------
-const field = (rec: string, f: string) => g.node(rec).apply(f).value;
+const field = Entry.read;
 const cellKey = (rec: string) => [field(rec, "emp"), field(rec, "date"), field(rec, "proj")].join(" | ");
 
-// discover ALL entries FROM THE GRAPH (not from `log`): emp() -> apps -> records
+// discover ALL entries FROM THE GRAPH (not from `log`): emp() -> apps -> records.
+// An application's inputs are [emp(), subject] IN THAT ORDER — that is how apply
+// builds them — so the record is index 1. Read from structure, never by testing
+// what a name looks like.
 function allRecords(): string[] {
-  const recs: string[] = [];
-  for (const app of g.node("emp()").to().nodes)
-    for (const inp of app.from().nodes)
-      if (!inp.value.endsWith("()")) recs.push(inp.value);
-  return recs;
+  return g.node("emp()").to().nodes
+    .map(app => app.from().nodes[1]?.value)
+    .filter((v): v is string => v !== undefined);
 }
 
 console.log("=== the append log (writes, in order) ===");

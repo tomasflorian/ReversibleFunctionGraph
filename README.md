@@ -119,7 +119,7 @@ they check, so they can't be peeled off without weakening them.
 | `dense` | Two experiments: an anagram family packed as dense as possible (no dead ends at all), then a foreign IP record bolted on to spoil it — which stays sparse, yet still fuses at `"3"`. |
 | `flat` | Functions calling functions — nested but flat — plus `NOTHING`, with counters proving memoization and that downstream never runs on a failed value. |
 | `types` | Types are discovered, not declared: a type is the extension of a predicate, readable both ways (value → its types, type → its members). |
-| `path` | Two ingestion methods. The *function names* stay separate (`firstName()` ≠ `first()`), but the **values converge**: `"robert smith"`, `"smith, robert"` and a CSV row all land on the same `robert` node. Three tables, one island. |
+| `path` | Two ingestion methods that *don't* converge — they are separate islands, because the data names the fields, not the code. Dedup still bites inside method 1: `"robert smith"` and `"smith, robert"` land on the same `robert`. |
 | `timesheet` | A real app: no mutable cell. An edit is an append; "current" is a latest-wins query; history stays walkable. |
 | `timesheet-cli` | The same, interactive, built on `shapes.ts`. Edit chains instead of sequence numbers. |
 

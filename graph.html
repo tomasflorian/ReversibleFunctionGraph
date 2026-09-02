@@ -270,7 +270,7 @@
 
       // sort state: which column, which direction. col null => subjects A→Z.
       let sort = { col: null, dir: 1 };
-      const SUBJ = ""; // sentinel meaning "the subject (row-header) column"
+      const SUBJ = "\u0001"; // sentinel meaning "the subject (row-header) column"
 
       // compare two result strings: numeric when both are numbers, else text.
       function cmp(a, b) {
@@ -366,7 +366,7 @@
       let pathTier = 1, pathCache = null;
 
       function computePaths(a, b) {
-        const key = a + " " + b;
+        const key = a + "\u0000" + b;
         if (pathCache && pathCache.key === key) return pathCache;
         pathTier = 1;                                  // new pair → back to shortest
         const paths = [], path = [a], visited = new Set([a]);
