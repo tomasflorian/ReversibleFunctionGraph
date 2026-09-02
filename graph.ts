@@ -23,11 +23,25 @@ class Node extends KNode {
   to(): Tree { return new Tree(this.outNodes() as Node[]); }
   apply(fn: string, ...rest: string[]): Node { return super.apply(fn, ...rest) as Node; } // retype
 
-  // THE NUMBERED CUT: apply fn(this, i) for i = start, start+1, … until the impl
-  // returns nothing. Every format has this joint — CSV rows, array elements,
-  // paragraphs of a document — and writing it by hand means a bare `for(;;)`
-  // with a sentinel break. Builds exactly what that loop builds, terminating
-  // probe included.
+  // CHOP BY POSITION — one of the TWO ways one node becomes many:
+  //
+  //   by POSITION (here)            node.chop("dataRow", 1)  ->  row 1, row 2, …
+  //   by NAME (shapes.ts, record)   Entry.chop(rec)          ->  emp, date, proj…
+  //
+  // Same word because both are "one becomes many"; different axis. Cut by
+  // position when the data carries no names of its own — array elements, CSV
+  // rows, paragraphs of a document. Cut by name when it does — JSON keys, a CSV
+  // header. Every format has one joint or the other, usually both in sequence.
+  //
+  // Apply fn(this, i) for i = start, start+1, … until the impl returns nothing.
+  // By hand that is a bare `for(;;)` with a sentinel break; this builds exactly
+  // what that loop builds, terminating probe included.
+  //
+  // It lives HERE and not in shapes.ts because it makes no claim about the data.
+  // "This string is a pipe-separated record" is a claim, so record() is a shape.
+  // "Keep going until nothing comes back" is a loop — the claim is inside fn's
+  // impl, which the caller wrote. This is a repetition combinator over apply,
+  // the same way Tree.apply is.
   chop(fn: string, start = 0): Tree {
     const out: Node[] = [];
     for (let i = start; ; i++) {
