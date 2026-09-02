@@ -96,6 +96,29 @@ rendered 31 nodes, 48 edges -> data.js
 rendered 56 nodes, 65 edges -> data.js
 
 ════════════════════════════════════════════════════════════════════════
+  scenario: timesheet
+════════════════════════════════════════════════════════════════════════
+
+=== the append log (writes, in order) ===
+   bob  2026-08-25  projX  8  1
+   alice  2026-08-25  projX  5  2
+   bob  2026-08-26  projX  4  3
+   bob  2026-08-25  projX  6  4
+
+=== CURRENT timesheet (latest-wins projection) ===
+   bob | 2026-08-25 | projX  ->  6h
+   alice | 2026-08-25 | projX  ->  5h
+   bob | 2026-08-26 | projX  ->  4h
+
+=== history: nothing was erased ===
+   cell "bob | 2026-08-25 | projX" has 2 observations:
+      seq 1  ->  8h
+      seq 4  ->  6h
+   the old "8" node still exists, produced by:
+      hours(bob|2026-08-25|projX|8|1)
+rendered 41 nodes, 60 edges -> data.js
+
+════════════════════════════════════════════════════════════════════════
   general (scripted)
 ════════════════════════════════════════════════════════════════════════
 
