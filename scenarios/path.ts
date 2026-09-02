@@ -24,7 +24,7 @@
 // table means shapes MATCH. They are different questions.
 
 import { Graph, NOTHING } from "../graph.ts";
-import { renderData } from "../view.ts";
+import { renderData, snapshot } from "../view.ts";
 
 const g = new Graph();
 
@@ -65,5 +65,23 @@ for (const ep of ["192.168.1.10:8080", "192.168.1.10:443", "10.0.0.5:22"]) {
   g.node(ep).apply("ip");
   g.node(ep).apply("port");
 }
+
+// ============ METHOD 4: THE SAME CSV, SAID ONCE ============================
+// Method 2's row loop, one layer up. chop() IS the numbered cut, so the bare
+// for(;;) with its sentinel break collapses to a line. Same function name, same
+// CSV, same header-named columns — so if the sugar is faithful, every node it
+// asks for ALREADY EXISTS and the graph does not grow by one. That is the
+// project's litmus, run as a measurement instead of claimed in a comment.
+const before = snapshot(g);
+const rows = g.node(csv).chop("dataRow", 1);   // <- replaces the whole loop above
+for (const name of cols) rows.apply(name);     // <- each header-named function
+const after = snapshot(g);
+
+console.log("\n=== METHOD 4: the same CSV, via chop() ===");
+console.log("   rows found: " + rows.values.join("  |  "));
+console.log("   nodes " + before.nodes.length + " -> " + after.nodes.length +
+            "   edges " + before.edges.length + " -> " + after.edges.length +
+            (before.nodes.length === after.nodes.length &&
+             before.edges.length === after.edges.length ? "   (nothing new: faithful)" : "   (GREW — not faithful)"));
 
 renderData(g);

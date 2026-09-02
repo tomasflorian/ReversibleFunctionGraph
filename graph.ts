@@ -23,6 +23,21 @@ class Node extends KNode {
   to(): Tree { return new Tree(this.outNodes() as Node[]); }
   apply(fn: string, ...rest: string[]): Node { return super.apply(fn, ...rest) as Node; } // retype
 
+  // THE NUMBERED CUT: apply fn(this, i) for i = start, start+1, … until the impl
+  // returns nothing. Every format has this joint — CSV rows, array elements,
+  // paragraphs of a document — and writing it by hand means a bare `for(;;)`
+  // with a sentinel break. Builds exactly what that loop builds, terminating
+  // probe included.
+  chop(fn: string, start = 0): Tree {
+    const out: Node[] = [];
+    for (let i = start; ; i++) {
+      const piece = this.apply(fn, String(i));
+      if (piece.value === NOTHING) break;
+      out.push(piece);
+    }
+    return new Tree(out);
+  }
+
   log(label?: string): this {
     if (label === undefined) console.log(this.value);
     else console.log(label, this.value);
