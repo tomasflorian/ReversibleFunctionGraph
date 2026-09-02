@@ -1,3 +1,7 @@
+// SPEAKS: graph.ts directly. It predates relate.ts / shapes.ts and has NOT been
+// migrated on purpose — it is aspirational and may be rewritten, so the layers
+// are deliberately not shaped around it.
+//
 // general.ts — a generic loader CLI. Ground truth is a list of RAW SOURCES
 // (JSON / CSV). Replaying them chops everything into the graph; TABLES are gazed
 // back out of the graph (never stored). Edit/delete = change a source and REBUILD

@@ -1,5 +1,9 @@
-// play-flat.ts — functions calling functions (NESTED but FLAT), plus the
-// NOTHING / skip mechanic.
+// flat.ts — functions calling functions (NESTED but FLAT), plus the NOTHING /
+// skip mechanic.
+//
+// SPEAKS: graph.ts — model level on purpose. NOTHING, memoization and the
+// no-application-points-at-an-application rule are kernel mechanics; no
+// vocabulary above has anything to say about them.
 //   npx tsx scenarios/flat.ts
 //
 // Two things shown together:

@@ -1,4 +1,8 @@
 // path.ts — two ways to ingest people, and why they DON'T converge.
+//
+// SPEAKS: graph.ts, both by hand and via chop(). METHODS 1-3 build every node
+// explicitly; METHOD 4 says the same thing one level up. They share ONE graph on
+// purpose — that is what lets METHOD 4 prove it adds nothing.
 //   npx tsx scenarios/path.ts
 //
 // Method 1 (old): I hardcode firstName/lastName and apply them. The field lands

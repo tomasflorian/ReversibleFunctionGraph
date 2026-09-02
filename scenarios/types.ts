@@ -1,4 +1,8 @@
-// play-types.ts — types are not declared, they are DISCOVERED.
+// types.ts — types are not declared, they are DISCOVERED.
+//
+// SPEAKS: graph.ts — model level on purpose, and not for lack of a nicer way: a
+// "type" here is nothing but a function, so there is no higher vocabulary to
+// reach for. That is the finding, not a limitation.
 //   npx tsx scenarios/types.ts
 //
 // A "type" here is just the extension of a predicate: the set of values it

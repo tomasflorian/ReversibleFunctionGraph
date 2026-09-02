@@ -1,4 +1,7 @@
 // timesheet-cli.ts — INTERACTIVE console timesheet on the shapes vocabulary.
+//
+// SPEAKS: shapes.ts (record + versioned) over graph.ts — the most app-level
+// thing here, and the only file that never touches a node by hand.
 //   npx tsx scenarios/timesheet-cli.ts
 //
 // Nodes are shown RAW (pipe-delimited) everywhere, so you can copy a line from

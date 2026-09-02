@@ -1,5 +1,8 @@
 // timesheet.ts — a real app on the graph: enter entries, "edit" by APPENDING,
 // and read the current view as a LATEST-WINS query.
+//
+// SPEAKS: shapes.ts (record) over graph.ts — a USAGE demo, not a model demo. It
+// declares what the data IS and lets the layer def the fields and chop them.
 //   ./show.sh timesheet
 //
 // The point: there is no mutable cell. An entry is a record; an EDIT is a new

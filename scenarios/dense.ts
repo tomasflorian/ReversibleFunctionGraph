@@ -1,4 +1,7 @@
 // dense.ts — how dense can this graph get, and what happens when you spoil it?
+//
+// SPEAKS: graph.ts — model level on purpose. The subject is dedup itself, which
+// is only visible if you can watch raw nodes collapse onto each other.
 //   npx tsx scenarios/dense.ts
 //
 // TWO EXPERIMENTS in one graph.

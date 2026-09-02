@@ -1,4 +1,8 @@
-// play.ts — a tiny demo of RFG2. Run it, edit it, watch it re-run:
+// basic.ts — a tiny demo of RFG2. Run it, edit it, watch it re-run:
+//
+// SPEAKS: graph.ts — the lowest vocabulary, on purpose. This demo is about what
+// the MODEL is (node, apply, edge, the two-hop reverse). Sugar would hide the
+// exact thing it exists to show, so it must stay here.
 //   npx tsx scenarios/basic.ts
 //   npx tsx watch scenarios/basic.ts
 //
