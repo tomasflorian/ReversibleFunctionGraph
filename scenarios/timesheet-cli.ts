@@ -1,4 +1,4 @@
-// timesheet-cli.ts — INTERACTIVE console timesheet on the ergo window.
+// timesheet-cli.ts — INTERACTIVE console timesheet on the shapes vocabulary.
 //   npx tsx scenarios/timesheet-cli.ts
 //
 // Nodes are shown RAW (pipe-delimited) everywhere, so you can copy a line from
@@ -15,7 +15,7 @@
 //   log / open / help / quit
 
 import { Graph } from "../graph.ts";
-import { ergo } from "../ergo.ts";
+import { shapes } from "../shapes.ts";
 import { renderData } from "../view.ts";
 import * as readline from "node:readline";
 import { execFile } from "node:child_process";
@@ -25,12 +25,12 @@ const DATA = new URL("../data.js", import.meta.url);
 const HTML = fileURLToPath(new URL("../graph.html", import.meta.url));
 
 const g = new Graph();
-const e = ergo(g);
+const shape = shapes(g);
 
 const isDate = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d);
-const Entry = e.record("|", ["emp", "date", "proj", "hours"]);
-const Day   = e.record("-", ["year", "month", "day"], isDate);
-const edit  = e.versioned("edit");
+const Entry = shape.record("|", ["emp", "date", "proj", "hours"]);
+const Day   = shape.record("-", ["year", "month", "day"], isDate);
+const edit  = shape.versioned("edit");
 
 const log: string[] = []; // the roots we've added (chain starts)
 
