@@ -13,7 +13,7 @@
 // Non-convergence is the same mechanism as any two non-colliding strings.
 
 import { Graph, NOTHING } from "../graph.ts";
-import { renderData } from "../viz.ts";
+import { renderData } from "../view.ts";
 
 const g = new Graph();
 

@@ -11,7 +11,7 @@
 //     and downstream functions NEVER run on it. The skip lives in apply.
 
 import { Graph, NOTHING } from "../graph.ts";
-import { renderData } from "../viz.ts";
+import { renderData } from "../view.ts";
 
 const g = new Graph();
 

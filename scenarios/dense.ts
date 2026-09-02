@@ -14,7 +14,7 @@
 //     an input hub at once (the densest thing the model can express).
 
 import { Graph } from "../graph.ts";
-import { renderData } from "../viz.ts";
+import { renderData } from "../view.ts";
 
 const g = new Graph();
 g.def("length", s => String(s.length));

@@ -14,7 +14,7 @@
 // yet". Types appear the moment you ask.
 
 import { Graph, NOTHING } from "../graph.ts";
-import { renderData } from "../viz.ts";
+import { renderData } from "../view.ts";
 
 const g = new Graph();
 const passed = (n: { value: string }) => n.value !== NOTHING;

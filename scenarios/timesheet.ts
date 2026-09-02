@@ -9,7 +9,7 @@
 // the projection picks the max. The reader chooses the rule.
 
 import { Graph } from "../graph.ts";
-import { renderData } from "../viz.ts";
+import { renderData } from "../view.ts";
 
 const g = new Graph();
 

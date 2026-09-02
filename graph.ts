@@ -1,9 +1,13 @@
-// graph.ts — the ergonomic LAYER over kernel.ts.
+// graph.ts — the NAVIGATION layer over kernel.ts.
 //
 // The kernel (kernel.ts) is the whole engine: node + apply + edges + dedup + the
 // two guards. This file adds only comfort that peels off cleanly — Tree
-// navigation, display (log/toString/inspect), and snapshot — and re-exports the
-// same public API (Graph, Node, Tree, NOTHING) so nothing downstream changes.
+// navigation plus the console display that makes it readable (log/toString/
+// inspect) — and re-exports the same public API (Graph, Node, Tree, NOTHING) so
+// nothing downstream changes.
+//
+// It answers ONE question: how do I move around what is stored? Rendering the
+// graph as an external picture is a different question, and lives in view.ts.
 //
 // Delete anything in this file and the stored graph is byte-identical; the
 // kernel still builds it. That's the litmus, and it's why this is a layer.
@@ -17,7 +21,6 @@ type Item = Node | Tree;
 class Node extends KNode {
   from(): Tree { return new Tree(this.inNodes() as Node[]); }
   to(): Tree { return new Tree(this.outNodes() as Node[]); }
-  links(): Node[] { return this.outNodes() as Node[]; } // outgoing edges, for snapshot
   apply(fn: string, ...rest: string[]): Node { return super.apply(fn, ...rest) as Node; } // retype
 
   log(label?: string): this {
@@ -64,7 +67,8 @@ class Tree {
   }
 }
 
-// Graph = kernel Graph, but it mints enriched Nodes and can snapshot itself.
+// Graph = kernel Graph, but it mints enriched Nodes. (node/apply are retype-only:
+// they exist so callers see the enriched Node, not the kernel one.)
 class Graph extends KGraph {
   protected makeNode(value: string): Node { return new Node(value, this); }
   node(value: string): Node { return super.node(value) as Node; }
@@ -73,17 +77,6 @@ class Graph extends KGraph {
   // Everything a function ever produced: walk fn() -> its applications -> their
   // outputs. (The "fn()" spelling is the kernel's function-as-value node.)
   outputsOf(fn: string): string[] { return this.node(fn + "()").to().to().flatten().values; }
-
-  // A plain read-only view of the whole graph — for visualization.
-  snapshot(): {
-    nodes: { value: string; role: "value" | "application" }[];
-    edges: { from: string; to: string }[];
-  } {
-    const all = this.all() as Node[];
-    const nodes = all.map(n => ({ value: n.value, role: n.roleName }));
-    const edges = all.flatMap(n => n.links().map(to => ({ from: n.value, to: to.value })));
-    return { nodes, edges };
-  }
 }
 
 export { Graph, Node, Tree, NOTHING };

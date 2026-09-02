@@ -16,7 +16,7 @@
 
 import { Graph } from "../graph.ts";
 import { ergo } from "../ergo.ts";
-import { renderData } from "../viz.ts";
+import { renderData } from "../view.ts";
 import * as readline from "node:readline";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";

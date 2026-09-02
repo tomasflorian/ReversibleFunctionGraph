@@ -95,5 +95,5 @@ export class Graph {
     if (!impl) throw new Error(`no function named "${fn}"`);
     return impl(...args);
   }
-  all(): Node[] { return [...this.nodes.values()]; }                // the layer's snapshot reads this
+  all(): Node[] { return [...this.nodes.values()]; }                // every node; view.ts snapshot reads this
 }
