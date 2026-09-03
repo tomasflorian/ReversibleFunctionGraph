@@ -184,19 +184,9 @@ are meant to be argued with, rather than findings the kernel is holding steady.
 
 ### The opinions
 
-These came out of building `scenarios/text.ts` several different ways and keeping
-the one that read best. They exist because an unopinionated core offers too many
-ways to say one thing, and a pile of equivalent options is what makes upper
-layers hard to design. Each could have gone another way, and any of them is fair
+They exist because an unopinionated core offers too many ways to say one thing,
+and a pile of equivalent options is what makes upper layers hard to design. Each could have gone another way, and any of them is fair
 game to reopen — they are conclusions from a handful of experiments, not results.
-
-The line between the two lists: an opinion decides what gets stored, a guarantee
-describes what the store can hold. That yields a rough check rather than a rule.
-If a rule leaves the graph byte-identical whichever way it goes, it is not
-deciding what gets stored — so it is worth asking what it *is* doing. Sometimes
-the answer is that the model already settles it and the rule was describing the
-model all along, which is how the old depth opinion became G10. Sometimes the
-answer is that it is a matter of taste, and belongs in neither list.
 
 - **O1 — the list is the collection.** A `|`-joined string is the one
   representation of many-ness. Not arrays, not indices, not nested handles.
