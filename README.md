@@ -43,7 +43,7 @@ never type tags:
 | **Value** | a referenceable thing — a datum *or* a function | many | `"5"`, `"paris"`, `"length()"` |
 | **Application** | one specific call | exactly one | `"length(paris)"` |
 
-Eight guarantees hold the model together:
+Nine guarantees hold the model together:
 
 - **G1 — single output.** An Application has one output, unlimited inputs.
   Values are hubs and fan out freely.
@@ -65,6 +65,11 @@ Eight guarantees hold the model together:
 - **G8 — reversibility is absolute.** Every recorded computation can be walked
   backwards. Nothing may be built that produces a result you cannot get back
   from. This is the purpose, not a feature.
+- **G9 — record without judgment; select at read time.** Every path is qualified
+  by the applications it crosses, so a meaningless path (`paris → length(paris) →
+  5 → suite #5`) is *identifiable* rather than absent. Nothing may be dropped,
+  merged away, or refused at write time for looking like noise. That is a
+  query's decision, and a query can only make it if the write kept it.
 
 ### Calling
 
@@ -146,6 +151,11 @@ and a pile of equivalent options is what makes upper layers hard to design.
   defect.
 - **O5 — a record is a list with named slots.** `record` and `sequence` are two
   access modes over one substrate: name the slots, or take members by content.
+- **O6 — depth is discovered, not declared.** Nothing hardcodes how many levels
+  a source has. Keep cutting until a cut yields no parts, or yields back its own
+  input — that is the bottom, and the model already signals it. `document →
+  chapters → sections → paragraphs → sentences → words` and `source → rows →
+  fields` are one procedure at two depths, not two procedures.
 
 The deletion that enforces O2 and O3: `graph.ts` has no `chop`. Counting a cut
 is the one way of saying it that the opinions refuse, so the method does not
