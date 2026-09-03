@@ -103,37 +103,41 @@ rendered 56 nodes, 65 edges -> data.js
   scenario: text
 ════════════════════════════════════════════════════════════════════════
 
-=== THE CUT: a predicate, not a probe ===
-   the driver is the plain nested loop — no index, no chop:
-     for p of text.split(2 newlines) -> for s of p.split(newline) -> for w of s.split(space)
-   paragraphs: 3
-   a non-member is silent: ∅
+=== TWO STAGES: cut makes a list, digest breaks it up ===
+   sentence: paris is a city
+   cutWords -> paris|is|a|city    (one application, one output)
+   digested -> paris  is  a  city
 
-=== NOTHING SYNTHETIC: every argument was already a node ===
-   value nodes that are bare integers: 0
-   nodes, content-keyed: 49  indexed: 55  (6 of the indexed graph is bookkeeping)
+=== DISCOVERY IS BACK: the driver splits nothing ===
+   for (const p of paragraphs.of(text))
+     for (const s of sentences.of(p.value))
+       words.of(s.value);
+   every part came off a list the graph computed, not off a JS split.
 
-=== BACK TO THE SOURCE: unchanged, still four hops ===
+=== ORDER IS NOW A NODE, not just recoverable ===
+   a|city|is|a|place
+   "a" is one value node, but the list keeps both of its positions.
+
+=== ONE UNIVERSAL element(), every level ===
+   extractions recorded: 28
+   cut functions defined: 3
+   so 3 cuts + 1 element replace 3 membership predicates.
+
+=== BACK TO THE SOURCE: now through the list ===
    word      "old"
+   its list  the|city|is|old
    sentence  the city is old
    paragraph paris is a city / the city is old
-   document  paris is a city / the city is old /  / tokyo is a city / the city is new /  / a city is a place
 
-=== WHAT COLLAPSED, AND WHERE IT CAME BACK ===
-   sentence: a city is a place
-   "a" occurs twice, but the graph holds one fact: 1
-   words as a set: a city is place
-   and the order is still right there in the container:
-     0:a  1:city  2:is  3:a  4:place
+=== THE COST, MEASURED ===
+   nodes, cut+digest: 66  predicate-only: 48
+   the extra nodes are the list values and the cut applications —
+   that is what buys discovery and an explicit ordering.
 
-=== THE PRICE: every piece is a 2-cycle ===
-   word(a city is a place,city)
-     inputs: word()  a city is a place  city
-     output: city
-   so "city" is both an input and the output of one application.
-   and a one-sentence paragraph repeats its argument, so an edge is dropped:
-     sentence(a city is a place,a city is a place) inputs: sentence()  a city is a place
-rendered 49 nodes, 111 edges -> data.js
+=== SELF-REFERENCE, where a cut yields one piece ===
+   cutSentences(a city is a place) -> a city is a place
+   the list IS the input, so the cut application points back at its own argument.
+rendered 66 nodes, 138 edges -> data.js
 
 ════════════════════════════════════════════════════════════════════════
   scenario: text-index

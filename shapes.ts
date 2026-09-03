@@ -1,6 +1,8 @@
 import { Graph } from "./graph.ts";
 import { relate } from "./relate.ts";
 
+const LIST = "|";
+
 export function shapes(g: Graph) {
   const { follow, back } = relate(g);
 
@@ -12,6 +14,17 @@ export function shapes(g: Graph) {
     const read = (rec: string, f: string) => g.node(rec).apply(f).value;
     const put  = (...vals: string[]) => chop(make(...vals));
     return { make, chop, read, put, fields };
+  }
+
+  function sequence(name: string, split: (s: string) => string[]) {
+    g.def(name, s => split(s).join(LIST));
+    g.def("element", (list, part) => list.split(LIST).includes(part) ? part : null);
+    const list = (s: string) => g.node(s).apply(name);
+    const of = (s: string) => {
+      const l = list(s);
+      return l.value.split(LIST).map(p => l.apply("element", p));
+    };
+    return { list, of };
   }
 
   function versioned(rel: string) {
@@ -29,5 +42,5 @@ export function shapes(g: Graph) {
     return { next, prev, tip, root, chain, apply };
   }
 
-  return { record, versioned };
+  return { record, sequence, versioned };
 }

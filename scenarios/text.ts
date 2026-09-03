@@ -1,13 +1,15 @@
 import { Graph } from "../graph.ts";
 import { relate } from "../relate.ts";
+import { shapes } from "../shapes.ts";
 import { renderData } from "../view.ts";
 
 const g = new Graph();
-const { follow, back } = relate(g);
+const { back } = relate(g);
+const { sequence } = shapes(g);
 
-g.def("paragraph", (t, p) => t.split("\n\n").includes(p) ? p : null);
-g.def("sentence",  (p, s) => p.split("\n").includes(s)   ? s : null);
-g.def("word",      (s, w) => s.split(" ").includes(w)    ? w : null);
+const paragraphs = sequence("cutParagraphs", t => t.split("\n\n"));
+const sentences  = sequence("cutSentences",  p => p.split("\n"));
+const words      = sequence("cutWords",      s => s.split(" "));
 
 const text =
 `paris is a city
@@ -18,66 +20,67 @@ the city is new
 
 a city is a place`;
 
-for (const p of text.split("\n\n")) {
-  g.node(text).apply("paragraph", p);
-  for (const s of p.split("\n")) {
-    g.node(p).apply("sentence", s);
-    for (const w of s.split(" ")) g.node(s).apply("word", w);
-  }
-}
+for (const p of paragraphs.of(text))
+  for (const s of sentences.of(p.value))
+    words.of(s.value);
 
 const oneLine = (s: string) => s.replace(/\n/g, " / ");
-const uniq = (xs: string[]) => [...new Set(xs)];
 
-console.log("=== THE CUT: a predicate, not a probe ===");
-console.log("   the driver is the plain nested loop — no index, no chop:");
-console.log("     for p of text.split(2 newlines) -> for s of p.split(newline) -> for w of s.split(space)");
-console.log("   paragraphs:", follow(text, "paragraph").length);
-console.log("   a non-member is silent:", g.node(text).apply("paragraph", "tokyo").value);
+console.log("=== TWO STAGES: cut makes a list, digest breaks it up ===");
+const sent = "paris is a city";
+console.log("   sentence:", sent);
+console.log("   cutWords ->", words.list(sent).value, "   (one application, one output)");
+console.log("   digested ->", words.of(sent).map(n => n.value).join("  "));
 
-console.log("\n=== NOTHING SYNTHETIC: every argument was already a node ===");
-const positions = g.all().filter(n => /^\d+$/.test(n.value));
-console.log("   value nodes that are bare integers:", positions.length);
+console.log("\n=== DISCOVERY IS BACK: the driver splits nothing ===");
+console.log("   for (const p of paragraphs.of(text))");
+console.log("     for (const s of sentences.of(p.value))");
+console.log("       words.of(s.value);");
+console.log("   every part came off a list the graph computed, not off a JS split.");
+
+console.log("\n=== ORDER IS NOW A NODE, not just recoverable ===");
+console.log("   " + words.list("a city is a place").value);
+console.log('   "a" is one value node, but the list keeps both of its positions.');
+
+console.log("\n=== ONE UNIVERSAL element(), every level ===");
+const digests = g.node("element()").to().nodes;
+console.log("   extractions recorded:", digests.length);
+console.log("   cut functions defined:", g.all().filter(n => /^cut\w+\(\)$/.test(n.value)).length);
+console.log("   so 3 cuts + 1 element replace 3 membership predicates.");
+
+console.log("\n=== BACK TO THE SOURCE: now through the list ===");
+const w = "old";
+for (const l of back(w, "element"))
+  for (const s of back(l, "cutWords"))
+    for (const l2 of back(s, "element"))
+      for (const p of back(l2, "cutSentences")) {
+        console.log('   word      "' + w + '"');
+        console.log("   its list  " + l);
+        console.log("   sentence  " + s);
+        console.log("   paragraph " + oneLine(p));
+      }
+
+console.log("\n=== THE COST, MEASURED ===");
 {
   const h = new Graph();
-  h.def("paragraph", (t, i) => t.split("\n\n")[+i] ?? null);
-  h.def("sentence",  (p, i) => p.split("\n")[+i]   ?? null);
-  h.def("word",      (s, i) => s.split(" ")[+i]    ?? null);
-  for (const p of h.node(text).chop("paragraph").nodes)
-    for (const s of p.chop("sentence").nodes) s.chop("word");
-  const mine = g.all().length, theirs = h.all().length;
-  console.log("   nodes, content-keyed:", mine, " indexed:", theirs,
-              " (" + (theirs - mine) + " of the indexed graph is bookkeeping)");
+  h.def("paragraph", (t, p) => t.split("\n\n").includes(p) ? p : null);
+  h.def("sentence",  (p, s) => p.split("\n").includes(s)   ? s : null);
+  h.def("word",      (s, x) => s.split(" ").includes(x)    ? x : null);
+  for (const p of text.split("\n\n")) {
+    h.node(text).apply("paragraph", p);
+    for (const s of p.split("\n")) {
+      h.node(p).apply("sentence", s);
+      for (const x of s.split(" ")) h.node(s).apply("word", x);
+    }
+  }
+  console.log("   nodes, cut+digest:", g.all().length, " predicate-only:", h.all().length);
+  console.log("   the extra nodes are the list values and the cut applications —");
+  console.log("   that is what buys discovery and an explicit ordering.");
 }
 
-console.log("\n=== BACK TO THE SOURCE: unchanged, still four hops ===");
-const w = "old";
-for (const s of back(w, "word"))
-  for (const p of back(s, "sentence"))
-    for (const d of back(p, "paragraph")) {
-      console.log('   word      "' + w + '"');
-      console.log("   sentence  " + s);
-      console.log("   paragraph " + oneLine(p));
-      console.log("   document  " + oneLine(d));
-    }
-
-console.log("\n=== WHAT COLLAPSED, AND WHERE IT CAME BACK ===");
-const sent = "a city is a place";
-console.log("   sentence:", sent);
-console.log('   "a" occurs twice, but the graph holds one fact:',
-            g.node(sent).to().values.filter(v => v.endsWith(",a)")).length);
-console.log("   words as a set:", uniq(follow(sent, "word")).join(" "));
-console.log("   and the order is still right there in the container:");
-console.log("     " + sent.split(" ").map((x, i) => i + ":" + x).join("  "));
-
-console.log("\n=== THE PRICE: every piece is a 2-cycle ===");
-const app = "word(" + sent + ",city)";
-console.log("   " + app);
-console.log("     inputs: " + g.node(app).from().values.join("  "));
-console.log("     output: " + g.node(app).to().values.join("  "));
-console.log('   so "city" is both an input and the output of one application.');
-console.log("   and a one-sentence paragraph repeats its argument, so an edge is dropped:");
-console.log("     sentence(" + sent + "," + sent + ") inputs: " +
-            g.node("sentence(" + sent + "," + sent + ")").from().values.join("  "));
+console.log("\n=== SELF-REFERENCE, where a cut yields one piece ===");
+const lone = "a city is a place";
+console.log("   cutSentences(" + lone + ") ->", sentences.list(lone).value);
+console.log("   the list IS the input, so the cut application points back at its own argument.");
 
 renderData(g);
