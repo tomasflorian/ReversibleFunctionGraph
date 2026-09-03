@@ -206,7 +206,7 @@ rendered 41 nodes, 60 edges -> data.js
   scenario: general-demo
 ════════════════════════════════════════════════════════════════════════
 
-rendered 138 nodes, 225 edges -> data.js
+rendered 157 nodes, 258 edges -> data.js
 === five sources, one technique ===
    raw text        cutParagraphs  2 members
    headered CSV    cutRows        2 members
@@ -216,34 +216,62 @@ rendered 138 nodes, 225 edges -> data.js
 
 === every leaf climbs back to its own source ===
    leaf            seine
-   word           paris|sits|on|the|seine
-   cutWords       paris sits on the seine
-   sentence       paris sits on the seine|tokyo sits on...
-   cutSentences   paris sits on the seine / tokyo sits ...
-   paragraph      paris sits on the seine / tokyo sits ...
-   cutParagraphs  paris sits on the seine / tokyo sits ...
+   word             paris|sits|on|the|seine
+   cutWords         paris sits on the seine
+   sentence         paris sits on the seine|tokyo sits on...
+   cutSentences     paris sits on the seine / tokyo sits ...
+   paragraph        paris sits on the seine / tokyo sits ...
+   cutParagraphs    paris sits on the seine / tokyo sits ...
 
    leaf            france
-   country        paris,france
-   row            paris,france|tokyo,japan
-   cutRows        city,country / paris,france / tokyo,j...
+   country          paris,france
+   row              paris,france|tokyo,japan
+   cutRows          city,country / paris,france / tokyo,j...
 
-   leaf            48.85
-   field          paris|2.35|48.85
-   cutFields      paris,2.35,48.85
-   line           paris,2.35,48.85|tokyo,139.69,35.68
-   cutLines       paris,2.35,48.85 / tokyo,139.69,35.68
+   leaf            europe
+   field            paris|france|europe
+   cutFields        paris,france,europe
+   line             paris,france,europe|tokyo,japan,asia
+   cutLines         paris,france,europe / tokyo,japan,asia
+
+   leaf            2.35,48.85
+   groupedField     paris|2.35,48.85
+   cutGroupedFields paris:2.35,48.85
+   groupedLine      paris:2.35,48.85|tokyo:139.69,35.68
+   cutGroupedLines  paris:2.35,48.85 / tokyo:139.69,35.68
 
    leaf            sumida
-   river          {"place":"tokyo","river":"sumida"}
-   item           {"place":"paris","river":"seine"}|{"p...
-   cutItems       [{"place":"paris","river":"seine"},{"...
+   river            {"place":"tokyo","river":"sumida"}
+   item             {"place":"paris","river":"seine"}|{"p...
+   cutItems         [{"place":"paris","river":"seine"},{"...
+
+   leaf            japan
+   nation           nation: japan
+   pair             name: tokyo|nation: japan
+   cutPairs         name: tokyo / nation: japan
+   block            name: paris / nation: france|name: to...
+   cutBlocks        name: paris / nation: france /  / nam...
+
+=== the vocabulary the sources taught the graph ===
+   city()      paris  tokyo
+   country()   france  japan
+   place()     paris  tokyo
+   river()     seine  sumida
+   name()      paris  tokyo
+   nation()    france  japan
+   field()     paris  france  europe  tokyo  japan  asia
+   groupedField()paris  2.35,48.85  tokyo  139.69,35.68
+   country() and nation() mean the same thing and stay apart:
+     the data named them differently, so nothing fuses them.
+   field() is anonymous — the unheadered CSV named nothing,
+     so those parts are reachable by content but not by vocabulary.
 
 === the sources share values without sharing shape ===
-   "paris" was produced by 5 applications:
+   "paris" was produced by 6 applications:
      word(paris|sits|on|the|seine,paris)
      city(paris,france)
-     field(paris|2.35|48.85,paris)
+     field(paris|france|europe,paris)
+     groupedField(paris|2.35,48.85,paris)
      place({"place":"paris","river":"seine"})
      name(name: paris)
 

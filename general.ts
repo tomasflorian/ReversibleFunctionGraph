@@ -18,11 +18,12 @@ function chopObject(obj: Record<string, unknown>): void {
   const s = JSON.stringify(obj);
   for (const key of Object.keys(obj)) {
     const val = obj[key];
-    g.def(key, (str: string) => {
-      const v = (JSON.parse(str) as Record<string, unknown>)[key];
-      return v === undefined || v === null ? null
-        : typeof v === "object" ? JSON.stringify(v) : String(v);
-    });
+    if (!columns.has(key))
+      g.def(key, (str: string) => {
+        const v = (JSON.parse(str) as Record<string, unknown>)[key];
+        return v === undefined || v === null ? null
+          : typeof v === "object" ? JSON.stringify(v) : String(v);
+      });
     columns.add(key);
     g.node(s).apply(key);
     if (val && typeof val === "object" && !Array.isArray(val))

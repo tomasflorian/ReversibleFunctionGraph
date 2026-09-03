@@ -234,6 +234,12 @@ they check, so they can't be peeled off without weakening them.
 - **Guard 2 — bipartite.** Every edge crosses value ↔ application. This is
   where G10 is enforced: no application ever points at another, so nesting stays
   *flat*.
+- **Guard 3 — a function is defined once.** `def` throws if the name is already
+  taken. A function name is the graph's vocabulary, so defining one twice means
+  two meanings for one word — and it fails silently, because calls already made
+  keep their memoized answers while only new ones get the new behaviour. Learn a
+  name once, then use it. Two sources needing different splitters need different
+  names.
 
 ## Scenarios
 

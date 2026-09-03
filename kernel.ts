@@ -55,7 +55,10 @@ export class Graph {
 
   protected makeNode(value: string): Node { return new Node(value, this); }
 
-  def(name: string, impl: Fn): void { this.fns.set(name, impl); }
+  def(name: string, impl: Fn): void {
+    if (this.fns.has(name)) throw new Error(`"${name}" is already defined`);
+    this.fns.set(name, impl);
+  }
 
   node(value: string): Node {
     const existing = this.nodes.get(value);

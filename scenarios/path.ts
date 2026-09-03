@@ -14,8 +14,7 @@ for (const raw of ["robert smith", "smith, robert",
 }
 
 g.def("headerLine", c => c.split("\n")[0]);
-g.def("cutRows", c => c.split("\n").slice(1).join("|"));
-g.def("row", (list, r) => list.split("|").includes(r) ? r : null);
+const Rows = sequence("cutRows", "row", c => c.split("\n").slice(1));
 
 const csv = "first,last\ncarol,white\ndave,green";
 g.node(csv);
@@ -38,12 +37,11 @@ for (const ep of ["192.168.1.10:8080", "192.168.1.10:443", "10.0.0.5:22"]) {
 }
 
 const before = snapshot(g);
-const rows = sequence("cutRows", "row", c => c.split("\n").slice(1));
-for (const r of rows.of(csv)) for (const name of cols) r.apply(name);
+for (const r of Rows.of(csv)) for (const name of cols) r.apply(name);
 const after = snapshot(g);
 
 console.log("\n=== METHOD 4: the same CSV, via sequence() ===");
-console.log("   rows found: " + rows.of(csv).map(n => n.value).join("  |  "));
+console.log("   rows found: " + Rows.of(csv).map(n => n.value).join("  |  "));
 console.log("   nodes " + before.nodes.length + " -> " + after.nodes.length +
             "   edges " + before.edges.length + " -> " + after.edges.length +
             (before.nodes.length === after.nodes.length &&

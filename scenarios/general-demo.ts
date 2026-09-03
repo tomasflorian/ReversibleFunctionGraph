@@ -54,8 +54,8 @@ for (const l of Lines.of(bare)) Fields.of(l.value);
 
 
 // ---------------------------------------------------------- sub grouped bare
-const SubGroupedLines = sequence("cutLines", "line", c => c.split("\n"));
-const SubGroupedFields = sequence("cutFields", "field", l => l.split(":"));
+const SubGroupedLines  = sequence("cutGroupedLines",  "groupedLine",  c => c.split("\n"));
+const SubGroupedFields = sequence("cutGroupedFields", "groupedField", l => l.split(":"));
 
 for (const l of SubGroupedLines.of(subGroupedBare)) SubGroupedFields.of(l.value);
 
@@ -63,24 +63,22 @@ for (const l of SubGroupedLines.of(subGroupedBare)) SubGroupedFields.of(l.value)
 // --------------------------------------------------------------------- JSON
 const Items = sequence("cutItems", "item", j => JSON.parse(j).map((o: unknown) => JSON.stringify(o)));
 
-for (const item of Items.of(json)) {
-  const obj = JSON.parse(item.value) as Record<string, string>;
-  for (const key of Object.keys(obj)) {
-    g.def(key, s => (JSON.parse(s) as Record<string, string>)[key] ?? null);
-    item.apply(key);
-  }
-}
+const items = Items.of(json);
+const jsonKeys = [...new Set(items.flatMap(i => Object.keys(JSON.parse(i.value))))];
+
+for (const key of jsonKeys)
+  g.def(key, s => (JSON.parse(s) as Record<string, string>)[key] ?? null);
+for (const item of items) for (const key of jsonKeys) item.apply(key);
 
 // ------------------------------------------------------ custom "key: value"
 const Blocks = sequence("cutBlocks", "block", t => t.split("\n\n"));
 const Pairs  = sequence("cutPairs",  "pair",  b => b.split("\n"));
 
-for (const b of Blocks.of(config))
-  for (const p of Pairs.of(b.value)) {
-    const key = p.value.split(": ")[0];
-    g.def(key, s => s.split(": ")[1] ?? null);
-    p.apply(key);
-  }
+const pairs = Blocks.of(config).flatMap(b => Pairs.of(b.value));
+const cfgKeys = [...new Set(pairs.map(p => p.value.split(": ")[0]))];
+
+for (const key of cfgKeys) g.def(key, s => s.split(": ")[1] ?? null);
+for (const p of pairs) p.apply(p.value.split(": ")[0]);
 
 renderData(g);
 
@@ -110,18 +108,20 @@ const climb = (leaf: string, rels: string[]) => {
   for (const rel of rels) {
     const up = back(here, rel)[0];
     if (up === undefined) break;
-    console.log("   " + rel.padEnd(15) + short(up));
+    console.log("   " + rel.padEnd(17) + short(up));
     here = up;
   }
   console.log("");
 };
 climb("seine",  ["word", "cutWords", "sentence", "cutSentences", "paragraph", "cutParagraphs"]);
 climb("france", ["country", "row", "cutRows"]);
-climb("48.85",  ["field", "cutFields", "line", "cutLines"]);
+climb("europe", ["field", "cutFields", "line", "cutLines"]);
+climb("2.35,48.85", ["groupedField", "cutGroupedFields", "groupedLine", "cutGroupedLines"]);
 climb("sumida", ["river", "item", "cutItems"]);
+climb("japan",  ["nation", "pair", "cutPairs", "block", "cutBlocks"]);
 
 console.log("=== the vocabulary the sources taught the graph ===");
-for (const fn of ["city", "country", "place", "river", "name", "nation", "field"])
+for (const fn of ["city", "country", "place", "river", "name", "nation", "field", "groupedField"])
   console.log("   " + (fn + "()").padEnd(12) + (g.outputsOf(fn).join("  ") || "(nothing)"));
 console.log("   country() and nation() mean the same thing and stay apart:");
 console.log("     the data named them differently, so nothing fuses them.");
