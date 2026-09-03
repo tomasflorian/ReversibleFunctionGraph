@@ -94,10 +94,10 @@ rendered 31 nodes, 48 edges -> data.js
 ════════════════════════════════════════════════════════════════════════
 
 
-=== METHOD 4: the same CSV, via chop() ===
+=== METHOD 4: the same CSV, via sequence() ===
    rows found: carol,white  |  dave,green
-   nodes 56 -> 56   edges 65 -> 65   (nothing new: faithful)
-rendered 56 nodes, 65 edges -> data.js
+   nodes 56 -> 56   edges 68 -> 68   (nothing new: faithful)
+rendered 56 nodes, 68 edges -> data.js
 
 ════════════════════════════════════════════════════════════════════════
   scenario: text

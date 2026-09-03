@@ -7,16 +7,6 @@ class Node extends KNode {
   to(): Tree { return new Tree(this.outNodes() as Node[]); }
   apply(fn: string, ...rest: string[]): Node { return super.apply(fn, ...rest) as Node; }
 
-  chop(fn: string, start = 0): Tree {
-    const out: Node[] = [];
-    for (let i = start; ; i++) {
-      const piece = this.apply(fn, String(i));
-      if (piece.value === NOTHING) break;
-      out.push(piece);
-    }
-    return new Tree(out);
-  }
-
   log(label?: string): this {
     if (label === undefined) console.log(this.value);
     else console.log(label, this.value);

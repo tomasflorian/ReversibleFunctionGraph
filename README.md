@@ -31,9 +31,9 @@ TypeScript runs directly through `tsx` — there is no build step.
 
 ## The model
 
-*This section is what the code answers to: where the two disagree, the code is
-wrong. Everything below it — layers, scenarios, viewer — is description, and
-describes only today.*
+*This section and **Opinions** below it are what the code answers to: where they
+and the code disagree, the code is wrong. Everything after that — layers,
+scenarios, viewer — is description, and describes only today.*
 
 One `Node` class. **Value** and **Application** are *roles read off structure*,
 never type tags:
@@ -124,6 +124,33 @@ skip lives in `apply`, not in the implementations.
 This is what makes predicates work as **types**: a predicate is
 identity-on-success, silent on failure, so passing one marks a value with that
 type for free, and a value can carry many types at once. See `scenarios/types.ts`.
+
+## Opinions
+
+The guarantees are what the model cannot violate. These are what the layers above
+it have *decided* — and unlike the guarantees, they could have gone another way.
+They exist because an unopinionated core offers too many ways to say one thing,
+and a pile of equivalent options is what makes upper layers hard to design.
+
+- **O1 — the list is the collection.** A `|`-joined string is the one
+  representation of many-ness. Not arrays, not indices, not nested handles.
+- **O2 — one becomes many in two rungs.** First cut the container into a list
+  (one application, one output — G1 satisfied rather than worked around), then
+  take members out of the list by content. `sequence` in `shapes.ts` is both
+  rungs.
+- **O3 — positions may be named, never counted.** `record` names a fixed, known
+  set of slots, so `lastOctet` is legitimate. Nothing may invent `0, 1, 2…` for a
+  count it does not know in advance.
+- **O4 — no synthetic values.** Every argument to an application is data, or a
+  node the graph already made. A value node that exists only as bookkeeping is a
+  defect.
+- **O5 — a record is a list with named slots.** `record` and `sequence` are two
+  access modes over one substrate: name the slots, or take members by content.
+
+The deletion that enforces O2 and O3: `graph.ts` has no `chop`. Counting a cut
+is the one way of saying it that the opinions refuse, so the method does not
+exist. `scenarios/text-index.ts` writes the counting loop out by hand, on
+purpose, as the shape to avoid.
 
 ## Layers
 

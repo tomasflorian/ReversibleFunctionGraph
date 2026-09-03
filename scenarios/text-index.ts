@@ -1,4 +1,4 @@
-import { Graph } from "../graph.ts";
+import { Graph, Node, NOTHING } from "../graph.ts";
 import { relate } from "../relate.ts";
 import { renderData } from "../view.ts";
 
@@ -18,14 +18,24 @@ the city is new
 
 a city is a place`;
 
-const paragraphs = g.node(text).chop("paragraph").nodes;
+const count = (subject: Node, fn: string): Node[] => {
+  const out: Node[] = [];
+  for (let i = 0; ; i++) {
+    const piece = subject.apply(fn, String(i));
+    if (piece.value === NOTHING) break;
+    out.push(piece);
+  }
+  return out;
+};
+
+const paragraphs = count(g.node(text), "paragraph");
 const sentences: string[] = [];
 const words: string[] = [];
 
 for (const p of paragraphs)
-  for (const s of p.chop("sentence").nodes) {
+  for (const s of count(p, "sentence")) {
     sentences.push(s.value);
-    for (const w of s.chop("word").nodes) words.push(w.value);
+    for (const w of count(s, "word")) words.push(w.value);
   }
 
 const oneLine = (s: string) => s.replace(/\n/g, " / ");
