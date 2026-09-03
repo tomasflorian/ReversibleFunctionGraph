@@ -158,7 +158,8 @@ they check, so they can't be peeled off without weakening them.
 | `flat` | Functions calling functions — nested but flat — plus `NOTHING`, with counters proving memoization and that downstream never runs on a failed value. |
 | `types` | Types are discovered, not declared: a type is the extension of a predicate, readable both ways (value → its types, type → its members). |
 | `path` | Two ingestion methods that *don't* converge — they are separate islands, because the data names the fields, not the code. Dedup still bites inside method 1: `"robert smith"` and `"smith, robert"` land on the same `robert`. |
-| `text` | Cutting prose three levels deep by position — paragraph, sentence, word — then walking one word back up to the raw source. Dedup makes `"city"` a single node with five producers; a one-sentence paragraph is its own first sentence. |
+| `text` | Cutting prose three levels deep — paragraph, sentence, word — keyed by the piece itself rather than a position, so the cut is a predicate and nothing synthetic enters the graph. Walks one word back up to the raw source; order and repetition are recovered from the container, which is still a node. |
+| `text-index` | The same cut keyed by position via `chop()`, kept for contrast: it works, but manufactures integer value nodes that fuse across unrelated cuts. Compare the two pictures. |
 | `timesheet` | A real app: no mutable cell. An edit is an append; "current" is a latest-wins query; history stays walkable. |
 | `timesheet-cli` | The same, interactive, built on `shapes.ts`. Edit chains instead of sequence numbers. |
 

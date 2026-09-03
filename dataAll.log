@@ -103,6 +103,42 @@ rendered 56 nodes, 65 edges -> data.js
   scenario: text
 ════════════════════════════════════════════════════════════════════════
 
+=== THE CUT: a predicate, not a probe ===
+   the driver is the plain nested loop — no index, no chop:
+     for p of text.split(2 newlines) -> for s of p.split(newline) -> for w of s.split(space)
+   paragraphs: 3
+   a non-member is silent: ∅
+
+=== NOTHING SYNTHETIC: every argument was already a node ===
+   value nodes that are bare integers: 0
+   nodes, content-keyed: 49  indexed: 55  (6 of the indexed graph is bookkeeping)
+
+=== BACK TO THE SOURCE: unchanged, still four hops ===
+   word      "old"
+   sentence  the city is old
+   paragraph paris is a city / the city is old
+   document  paris is a city / the city is old /  / tokyo is a city / the city is new /  / a city is a place
+
+=== WHAT COLLAPSED, AND WHERE IT CAME BACK ===
+   sentence: a city is a place
+   "a" occurs twice, but the graph holds one fact: 1
+   words as a set: a city is place
+   and the order is still right there in the container:
+     0:a  1:city  2:is  3:a  4:place
+
+=== THE PRICE: every piece is a 2-cycle ===
+   word(a city is a place,city)
+     inputs: word()  a city is a place  city
+     output: city
+   so "city" is both an input and the output of one application.
+   and a one-sentence paragraph repeats its argument, so an edge is dropped:
+     sentence(a city is a place,a city is a place) inputs: sentence()  a city is a place
+rendered 49 nodes, 111 edges -> data.js
+
+════════════════════════════════════════════════════════════════════════
+  scenario: text-index
+════════════════════════════════════════════════════════════════════════
+
 === THE CUT: three levels, all by position ===
    paragraphs: 3
    sentences:  5 (5 distinct)
