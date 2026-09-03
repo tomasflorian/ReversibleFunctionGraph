@@ -16,8 +16,12 @@ const headered = `city,country
 paris,france
 tokyo,japan`;
 
-const bare = `paris,2.35,48.85
-tokyo,139.69,35.68`;
+const bare = `paris,france,europe
+tokyo,japan,asia`;
+
+const subGroupedBare = `paris:2.35,48.85
+tokyo:139.69,35.68`;
+
 
 const json = `[{"place":"paris","river":"seine"},{"place":"tokyo","river":"sumida"}]`;
 
@@ -47,6 +51,14 @@ const Lines  = sequence("cutLines",  "line",  c => c.split("\n"));
 const Fields = sequence("cutFields", "field", l => l.split(","));
 
 for (const l of Lines.of(bare)) Fields.of(l.value);
+
+
+// ---------------------------------------------------------- sub grouped bare
+const SubGroupedLines = sequence("cutLines", "line", c => c.split("\n"));
+const SubGroupedFields = sequence("cutFields", "field", l => l.split(":"));
+
+for (const l of SubGroupedLines.of(subGroupedBare)) SubGroupedFields.of(l.value);
+
 
 // --------------------------------------------------------------------- JSON
 const Items = sequence("cutItems", "item", j => JSON.parse(j).map((o: unknown) => JSON.stringify(o)));
