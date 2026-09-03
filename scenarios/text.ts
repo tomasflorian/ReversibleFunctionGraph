@@ -7,9 +7,9 @@ const g = new Graph();
 const { back } = relate(g);
 const { sequence } = shapes(g);
 
-const paragraphs = sequence("cutParagraphs", t => t.split("\n\n"));
-const sentences  = sequence("cutSentences",  p => p.split("\n"));
-const words      = sequence("cutWords",      s => s.split(" "));
+const paragraphs = sequence("cutParagraphs", "paragraph", t => t.split("\n\n"));
+const sentences  = sequence("cutSentences",  "sentence",  p => p.split("\n"));
+const words      = sequence("cutWords",      "word",      s => s.split(" "));
 
 const text =
 `paris is a city
@@ -26,61 +26,50 @@ for (const p of paragraphs.of(text))
 
 const oneLine = (s: string) => s.replace(/\n/g, " / ");
 
-console.log("=== TWO STAGES: cut makes a list, digest breaks it up ===");
-const sent = "paris is a city";
-console.log("   sentence:", sent);
-console.log("   cutWords ->", words.list(sent).value, "   (one application, one output)");
-console.log("   digested ->", words.of(sent).map(n => n.value).join("  "));
+console.log("=== TWO RUNGS PER LEVEL: cut, then take ===");
+const sent = "the city is old";
+console.log("   cutWords(" + sent + ")");
+console.log("     -> " + words.list(sent).value);
+console.log("   word(" + words.list(sent).value + ", old)");
+console.log("     -> " + g.node(words.list(sent).value).apply("word", "old").value);
 
-console.log("\n=== DISCOVERY IS BACK: the driver splits nothing ===");
+console.log("\n=== THE DRIVER SPLITS NOTHING ===");
 console.log("   for (const p of paragraphs.of(text))");
 console.log("     for (const s of sentences.of(p.value))");
 console.log("       words.of(s.value);");
-console.log("   every part came off a list the graph computed, not off a JS split.");
 
-console.log("\n=== ORDER IS NOW A NODE, not just recoverable ===");
-console.log("   " + words.list("a city is a place").value);
-console.log('   "a" is one value node, but the list keeps both of its positions.');
-
-console.log("\n=== ONE UNIVERSAL element(), every level ===");
-const digests = g.node("element()").to().nodes;
-console.log("   extractions recorded:", digests.length);
-console.log("   cut functions defined:", g.all().filter(n => /^cut\w+\(\)$/.test(n.value)).length);
-console.log("   so 3 cuts + 1 element replace 3 membership predicates.");
-
-console.log("\n=== BACK TO THE SOURCE: now through the list ===");
-const w = "old";
-for (const l of back(w, "element"))
-  for (const s of back(l, "cutWords"))
-    for (const l2 of back(s, "element"))
-      for (const p of back(l2, "cutSentences")) {
-        console.log('   word      "' + w + '"');
-        console.log("   its list  " + l);
-        console.log("   sentence  " + s);
-        console.log("   paragraph " + oneLine(p));
-      }
-
-console.log("\n=== THE COST, MEASURED ===");
-{
-  const h = new Graph();
-  h.def("paragraph", (t, p) => t.split("\n\n").includes(p) ? p : null);
-  h.def("sentence",  (p, s) => p.split("\n").includes(s)   ? s : null);
-  h.def("word",      (s, x) => s.split(" ").includes(x)    ? x : null);
-  for (const p of text.split("\n\n")) {
-    h.node(text).apply("paragraph", p);
-    for (const s of p.split("\n")) {
-      h.node(p).apply("sentence", s);
-      for (const x of s.split(" ")) h.node(s).apply("word", x);
-    }
-  }
-  console.log("   nodes, cut+digest:", g.all().length, " predicate-only:", h.all().length);
-  console.log("   the extra nodes are the list values and the cut applications —");
-  console.log("   that is what buys discovery and an explicit ordering.");
+console.log("\n=== UP THE LADDER: the names alternate all the way ===");
+let here = "old";
+console.log("   start         " + JSON.stringify(here));
+for (const rel of ["word", "cutWords", "sentence", "cutSentences"]) {
+  const up = back(here, rel)[0];
+  if (up === undefined) break;
+  console.log("   " + rel.padEnd(13) + " " + oneLine(up));
+  here = up;
 }
 
-console.log("\n=== SELF-REFERENCE, where a cut yields one piece ===");
-const lone = "a city is a place";
-console.log("   cutSentences(" + lone + ") ->", sentences.list(lone).value);
-console.log("   the list IS the input, so the cut application points back at its own argument.");
+console.log("\n=== HUBS: one shared name split into three ===");
+for (const fn of ["paragraph", "sentence", "word", "cutParagraphs", "cutSentences", "cutWords"])
+  console.log("   " + (fn + "()").padEnd(16) + "degree " + g.node(fn + "()").to().nodes.length);
+const worst = g.all()
+  .map(n => ({ v: n.value, d: n.from().nodes.length + n.to().nodes.length }))
+  .sort((a, b) => b.d - a.d)[0];
+console.log("   biggest hub in the graph: " + worst.d + "  " + JSON.stringify(worst.v).slice(0, 40));
+
+console.log("\n=== PER-LEVEL QUERIES, NOW TWO HOPS ===");
+const allWords = [...new Set(g.node("word()").to().to().flatten().values)];
+console.log("   every word:", allWords.sort().join(" "));
+console.log("   every sentence:", g.node("sentence()").to().to().flatten().values.length, "extractions");
+
+console.log("\n=== WHERE THE LEVELS NO LONGER SHARE A FACT ===");
+{
+  const h = new Graph();
+  const sh = shapes(h);
+  sh.sequence("cutSentences", "sentence", p => p.split("\n")).of("hello");
+  sh.sequence("cutWords", "word", s => s.split(" ")).of("hello");
+  console.log("   a one-word sentence, cut both ways:");
+  console.log("     " + h.node("hello").to().values.join("   "));
+  console.log("   two applications now, not one — the fn name says which cut's list it is.");
+}
 
 renderData(g);

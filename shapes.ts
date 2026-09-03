@@ -16,13 +16,13 @@ export function shapes(g: Graph) {
     return { make, chop, read, put, fields };
   }
 
-  function sequence(name: string, split: (s: string) => string[]) {
-    g.def(name, s => split(s).join(LIST));
-    g.def("element", (list, part) => list.split(LIST).includes(part) ? part : null);
-    const list = (s: string) => g.node(s).apply(name);
+  function sequence(cut: string, elem: string, split: (s: string) => string[]) {
+    g.def(cut, s => split(s).join(LIST));
+    g.def(elem, (l, part) => l.split(LIST).includes(part) ? part : null);
+    const list = (s: string) => g.node(s).apply(cut);
     const of = (s: string) => {
       const l = list(s);
-      return l.value.split(LIST).map(p => l.apply("element", p));
+      return l.value.split(LIST).map(p => l.apply(elem, p));
     };
     return { list, of };
   }

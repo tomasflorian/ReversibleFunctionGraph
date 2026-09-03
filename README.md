@@ -158,8 +158,8 @@ they check, so they can't be peeled off without weakening them.
 | `flat` | Functions calling functions — nested but flat — plus `NOTHING`, with counters proving memoization and that downstream never runs on a failed value. |
 | `types` | Types are discovered, not declared: a type is the extension of a predicate, readable both ways (value → its types, type → its members). |
 | `path` | Two ingestion methods that *don't* converge — they are separate islands, because the data names the fields, not the code. Dedup still bites inside method 1: `"robert smith"` and `"smith, robert"` land on the same `robert`. |
-| `text` | Cutting prose three levels deep in two stages: `cut` joins the pieces into one `\|`-list value, then digest breaks that list up with a single universal `element`. The driver splits nothing itself — every piece comes off a list the graph computed. Order becomes an addressable node rather than something recovered from the container. |
-| `text-index` | The same cut keyed by position via `chop()`, kept for contrast: it works, but manufactures integer value nodes that fuse across unrelated cuts. Compare the two pictures. |
+| `text` | Cutting prose three levels deep in two rungs per level: `cut` joins the pieces into one `\|`-list value, then a per-level extraction (`paragraph`, `sentence`, `word`) takes members out of it. The driver splits nothing itself — every piece comes off a list the graph computed — and order becomes an addressable node rather than something recovered from the container. |
+| `text-index` | **Kept deliberately as the shape to avoid.** The same cut keyed by position via `chop()`: it works, but manufactures integer value nodes that fuse across unrelated cuts, so the node `"1"` ends up being both a position and a word. Do not "fix" this one — compare its picture to `text`. |
 | `timesheet` | A real app: no mutable cell. An edit is an append; "current" is a latest-wins query; history stays walkable. |
 | `timesheet-cli` | The same, interactive, built on `shapes.ts`. Edit chains instead of sequence numbers. |
 

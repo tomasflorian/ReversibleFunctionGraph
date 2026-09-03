@@ -103,41 +103,42 @@ rendered 56 nodes, 65 edges -> data.js
   scenario: text
 ════════════════════════════════════════════════════════════════════════
 
-=== TWO STAGES: cut makes a list, digest breaks it up ===
-   sentence: paris is a city
-   cutWords -> paris|is|a|city    (one application, one output)
-   digested -> paris  is  a  city
+=== TWO RUNGS PER LEVEL: cut, then take ===
+   cutWords(the city is old)
+     -> the|city|is|old
+   word(the|city|is|old, old)
+     -> old
 
-=== DISCOVERY IS BACK: the driver splits nothing ===
+=== THE DRIVER SPLITS NOTHING ===
    for (const p of paragraphs.of(text))
      for (const s of sentences.of(p.value))
        words.of(s.value);
-   every part came off a list the graph computed, not off a JS split.
 
-=== ORDER IS NOW A NODE, not just recoverable ===
-   a|city|is|a|place
-   "a" is one value node, but the list keeps both of its positions.
+=== UP THE LADDER: the names alternate all the way ===
+   start         "old"
+   word          the|city|is|old
+   cutWords      the city is old
+   sentence      paris is a city|the city is old
+   cutSentences  paris is a city / the city is old
 
-=== ONE UNIVERSAL element(), every level ===
-   extractions recorded: 28
-   cut functions defined: 3
-   so 3 cuts + 1 element replace 3 membership predicates.
+=== HUBS: one shared name split into three ===
+   paragraph()     degree 3
+   sentence()      degree 5
+   word()          degree 20
+   cutParagraphs() degree 1
+   cutSentences()  degree 3
+   cutWords()      degree 5
+   biggest hub in the graph: 20  "word()"
 
-=== BACK TO THE SOURCE: now through the list ===
-   word      "old"
-   its list  the|city|is|old
-   sentence  the city is old
-   paragraph paris is a city / the city is old
+=== PER-LEVEL QUERIES, NOW TWO HOPS ===
+   every word: a city is new old paris place the tokyo
+   every sentence: 5 extractions
 
-=== THE COST, MEASURED ===
-   nodes, cut+digest: 66  predicate-only: 48
-   the extra nodes are the list values and the cut applications —
-   that is what buys discovery and an explicit ordering.
-
-=== SELF-REFERENCE, where a cut yields one piece ===
-   cutSentences(a city is a place) -> a city is a place
-   the list IS the input, so the cut application points back at its own argument.
-rendered 66 nodes, 138 edges -> data.js
+=== WHERE THE LEVELS NO LONGER SHARE A FACT ===
+   a one-word sentence, cut both ways:
+     cutSentences(hello)   sentence(hello,hello)   cutWords(hello)   word(hello,hello)
+   two applications now, not one — the fn name says which cut's list it is.
+rendered 68 nodes, 138 edges -> data.js
 
 ════════════════════════════════════════════════════════════════════════
   scenario: text-index
