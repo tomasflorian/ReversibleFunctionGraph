@@ -31,6 +31,10 @@ TypeScript runs directly through `tsx` — there is no build step.
 
 ## The model
 
+*This section is what the code answers to: where the two disagree, the code is
+wrong. Everything below it — layers, scenarios, viewer — is description, and
+describes only today.*
+
 One `Node` class. **Value** and **Application** are *roles read off structure*,
 never type tags:
 
@@ -39,7 +43,7 @@ never type tags:
 | **Value** | a referenceable thing — a datum *or* a function | many | `"5"`, `"paris"`, `"length()"` |
 | **Application** | one specific call | exactly one | `"length(paris)"` |
 
-Four guarantees hold the model together:
+Eight guarantees hold the model together:
 
 - **G1 — single output.** An Application has one output, unlimited inputs.
   Values are hubs and fan out freely.
@@ -49,6 +53,18 @@ Four guarantees hold the model together:
   order and roles of a call live in the Application's *string*, not its edges.
 - **G4 — only strings.** The one data type is `string`. A string is a number or
   a list only through the function applied to it.
+- **G5 — roles are read, never stored.** Value and Application come off
+  structure — string form plus edges. Never a type, never a flag, never a field.
+  `apply` maintains them; nothing records them.
+- **G6 — meaning lives in the data, not the engine.** The header names the
+  columns. A type is whatever a predicate admits. "Latest wins" is a rule the
+  reader picks. The engine knows nothing of schema, type, or time.
+- **G7 — convergence is never engineered.** Things fuse because their strings
+  are equal, never because code decided they are related. No keys, no schema, no
+  matching rules — and two things failing to converge is equally correct.
+- **G8 — reversibility is absolute.** Every recorded computation can be walked
+  backwards. Nothing may be built that produces a result you cannot get back
+  from. This is the purpose, not a feature.
 
 ### Calling
 
@@ -74,6 +90,28 @@ g.node("upper()").to().log();      // [upper(paris)]       ← every use of uppe
 Reverse is **two hops** — value → Application → inputs — because the Application
 sits in between. That indirection *is* the win: the call is a node you can land
 on and query.
+
+### What one `apply` builds
+
+Applying `F` to arguments `A…`:
+
+1. compute the result string `R = fn(args)`
+2. find-or-create the Application node whose string is the canonical call
+   `"F(A…)"` — built deterministically, so identical calls dedup
+3. wire unlabeled directional edges: `F → App` and `A → App` for every argument,
+   then `App → R`
+4. dedup throughout: same call ⇒ same Application, same string ⇒ same Value
+
+So one call adds **1 Application node + (1 + #args) input edges + 1 output
+edge**, all deduplicated. `strContains(a,b)` and `strContains(b,a)` are different
+Applications with the same edge set — the *string* tells them apart (G3).
+
+### Function vs data: not distinguished in the core
+
+To apply, there is no node check: `apply("toLower", …)` looks up `"toLower"` in
+the impl registry. Present ⇒ function, absent ⇒ error. To *enumerate* functions
+you would give them edges to a `function` root — structural, not a flag — and
+that is deferred until introspection actually needs it.
 
 ### NOTHING
 
@@ -173,7 +211,6 @@ shapes.ts        declares records and edit-chains
 graph.html       viewer shell (reads data.js)
 general.ts       generic JSON/CSV loader CLI
 scenarios/       runnable demos
-spec.md          the model spec, written before the code
 run.sh           run a scenario
 show.sh          run a scenario + open the viewer
 runAll.sh        run everything -> dataAll.log
@@ -183,12 +220,21 @@ runAll.sh        run everything -> dataAll.log
 
 ## Not built yet
 
-Deliberately deferred, noted in `spec.md`: escaping for the argument separator,
-a `function` root for enumerating functions, digest/enrichment (splitting
-`|`-list values into element values as a background pass), forgetting,
-persistence, time and ordering, and a surface syntax.
+Deliberately deferred: escaping for the argument separator (and `|`), a
+`function` root for enumerating functions, digest/enrichment (splitting `|`-list
+values into element values as a background pass), persistence, time and
+ordering, and a surface syntax.
 
----
+## Known broken
 
-`spec.md` is the model spec — written before the code, and still the place where
-the reasoning lives.
+Facts about today's implementation, not the model. Delete when fixed.
+
+- **The argument separator is unescaped.** `apply` keys an Application as
+  `fn(args.join(","))`, so an argument containing `,` collides with a different
+  call: `join2("a,b","c")` and `join2("a","b,c")` are one node, and the second
+  silently receives the first's memoized result.
+- **A repeated argument loses its position.** `linkTo` skips an edge that
+  already exists, so `pair(x,x)` has inputs `[pair(), x]` — arg1 is gone.
+  Readers that index inputs positionally (`relate.ts`,
+  `scenarios/timesheet.ts`) are correct only while a call's arguments are
+  distinct.
