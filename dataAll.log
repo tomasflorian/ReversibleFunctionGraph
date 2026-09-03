@@ -203,6 +203,51 @@ rendered 55 nodes, 116 edges -> data.js
 rendered 41 nodes, 60 edges -> data.js
 
 ════════════════════════════════════════════════════════════════════════
+  scenario: general-demo
+════════════════════════════════════════════════════════════════════════
+
+rendered 138 nodes, 225 edges -> data.js
+=== five sources, one technique ===
+   raw text        cutParagraphs  2 members
+   headered CSV    cutRows        2 members
+   unheadered CSV  cutLines       2 members
+   JSON            cutItems       2 members
+   key: value      cutBlocks      2 members
+
+=== every leaf climbs back to its own source ===
+   leaf            seine
+   word           paris|sits|on|the|seine
+   cutWords       paris sits on the seine
+   sentence       paris sits on the seine|tokyo sits on...
+   cutSentences   paris sits on the seine / tokyo sits ...
+   paragraph      paris sits on the seine / tokyo sits ...
+   cutParagraphs  paris sits on the seine / tokyo sits ...
+
+   leaf            france
+   country        paris,france
+   row            paris,france|tokyo,japan
+   cutRows        city,country / paris,france / tokyo,j...
+
+   leaf            48.85
+   field          paris|2.35|48.85
+   cutFields      paris,2.35,48.85
+   line           paris,2.35,48.85|tokyo,139.69,35.68
+   cutLines       paris,2.35,48.85 / tokyo,139.69,35.68
+
+   leaf            sumida
+   river          {"place":"tokyo","river":"sumida"}
+   item           {"place":"paris","river":"seine"}|{"p...
+   cutItems       [{"place":"paris","river":"seine"},{"...
+
+=== the sources share values without sharing shape ===
+   "paris" was produced by 5 applications:
+     word(paris|sits|on|the|seine,paris)
+     city(paris,france)
+     field(paris|2.35|48.85,paris)
+     place({"place":"paris","river":"seine"})
+     name(name: paris)
+
+════════════════════════════════════════════════════════════════════════
   general (scripted)
 ════════════════════════════════════════════════════════════════════════
 
