@@ -10,10 +10,10 @@ export function shapes(g: Graph) {
     fields.forEach((f, i) =>
       g.def(f, r => (!guard || guard(r)) ? (r.split(sep)[i] ?? null) : null));
     const make = (...vals: string[]) => vals.join(sep);
-    const chop = (rec: string) => { for (const f of fields) g.node(rec).apply(f); return rec; };
+    const of   = (rec: string) => fields.map(f => g.node(rec).apply(f));
     const read = (rec: string, f: string) => g.node(rec).apply(f).value;
-    const put  = (...vals: string[]) => chop(make(...vals));
-    return { make, chop, read, put, fields };
+    const put  = (...vals: string[]) => { const rec = make(...vals); of(rec); return rec; };
+    return { make, of, read, put, fields };
   }
 
   function sequence(cut: string, elem: string, split: (s: string) => string[]) {

@@ -44,7 +44,7 @@ for (const p of Paragraphs.of(prose))
 const Rows = sequence("cutRows", "row", c => c.split("\n").slice(1));
 const Person = record(",", headered.split("\n")[0].split(","));
 
-for (const r of Rows.of(headered)) Person.chop(r.value);
+for (const r of Rows.of(headered)) Person.of(r.value);
 
 // ---------------------------------------------------------- unheadered CSV
 const Lines  = sequence("cutLines",  "line",  c => c.split("\n"));
@@ -120,6 +120,14 @@ climb("france", ["country", "row", "cutRows"]);
 climb("48.85",  ["field", "cutFields", "line", "cutLines"]);
 climb("sumida", ["river", "item", "cutItems"]);
 
-console.log("=== the sources share values without sharing shape ===");
+console.log("=== the vocabulary the sources taught the graph ===");
+for (const fn of ["city", "country", "place", "river", "name", "nation", "field"])
+  console.log("   " + (fn + "()").padEnd(12) + (g.outputsOf(fn).join("  ") || "(nothing)"));
+console.log("   country() and nation() mean the same thing and stay apart:");
+console.log("     the data named them differently, so nothing fuses them.");
+console.log("   field() is anonymous — the unheadered CSV named nothing,");
+console.log("     so those parts are reachable by content but not by vocabulary.");
+
+console.log("\n=== the sources share values without sharing shape ===");
 console.log('   "paris" was produced by ' + g.node("paris").from().nodes.length + " applications:");
 for (const a of g.node("paris").from().nodes) console.log("     " + short(a.value));

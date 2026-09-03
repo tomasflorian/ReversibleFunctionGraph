@@ -12,7 +12,7 @@ const log = [
   "bob|2026-08-26|projX|4|3",
   "bob|2026-08-25|projX|6|4",
 ];
-for (const rec of log) Entry.chop(rec);
+for (const rec of log) Entry.of(rec);
 
 const field = Entry.read;
 const cellKey = (rec: string) => [field(rec, "emp"), field(rec, "date"), field(rec, "proj")].join(" | ");

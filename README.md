@@ -85,14 +85,15 @@ because they were decided in advance:
 - **G10 — depth is not pre-determined.** Every edge crosses value ↔
   application, so no application ever points at another: a nested call is two
   applications side by side, never one inside the other. Levels are not stored
-  anywhere, only walked — whatever depth exists emerged from what was ingested.
+  anywhere, only walked — whatever depth exists came from what the caller cut.
   It can also grow later, in either direction, without disturbing what is
   already there: a further cut adds a level below, and a source that turns out
-  to be part of something larger gains one above. So the bottom of a cut is
-  something the model signals — `NOTHING`, or a cut that returns its own input —
-  rather than something code can know in advance. `document → chapters →
-  sections → paragraphs → sentences → words` and `source → rows → fields` are
-  one procedure at two depths, not two procedures.
+  to be part of something larger gains one above. How far to descend is the
+  caller's decision, made per source as a chain of splitters. The model
+  neither knows nor records how long that chain was — which is what lets two
+  sources of different depths share one graph. `document → chapters → sections
+  → paragraphs → sentences → words` and `source → rows → fields` are one
+  procedure at two depths, not two procedures.
 
 ### Calling
 
@@ -201,8 +202,12 @@ game to reopen — they are conclusions from a handful of experiments, not resul
 - **O4 — no synthetic values.** Every argument to an application is data, or a
   node the graph already made. A value node that exists only as bookkeeping is a
   smell — it means something outside the data is being represented inside it.
-- **O5 — a record is a list with named slots.** `record` and `sequence` are two
-  access modes over one substrate: name the slots, or take members by content.
+- **O5 — two ways in: by name, or by content.** When a container names its
+  parts, the name becomes a function name — `record` is the batch case for
+  separator-delimited slots, and JSON keys or `key: value` lines do the same
+  thing with no separator at all. When nothing names them, cut to a list and
+  take members by content. Records take the first way in, collections the
+  second.
 
 O2 and O3 were made real by a deletion: `graph.ts` has no `chop`. Counting a cut
 was the one way of saying it these opinions rule out, so the method went away

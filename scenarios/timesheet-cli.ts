@@ -26,7 +26,7 @@ function current(): string[] {
 
 function addEntry(emp: string, date: string, proj: string, hours: string): void {
   const rec = Entry.make(emp, date, proj, hours);
-  Entry.chop(rec); Day.chop(Entry.read(rec, "date"));
+  Entry.of(rec); Day.of(Entry.read(rec, "date"));
   log.push(rec);
   renderData(g, DATA);
   console.log(`  added: ${rec}`);
