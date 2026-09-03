@@ -9,6 +9,13 @@ the call, wired into the graph. So "what is `length("paris")`?" and "what
 produced `5`?" and "everywhere `length` has ever been used" are all the same
 kind of question — a walk over edges.
 
+This is an exploration, not a specification. Nothing here was handed down; it is
+where the thinking currently stands, arrived at by building. The numbered lists
+below are load-bearing — build to them rather than around them — and they are
+also the most interesting things to argue with. Proposing that one of them
+should change is not friction, it is how this moves. What is asked is that they
+change by proposal rather than by drift.
+
 ```
 paris ─────▶ length(paris) ─────▶ 5
 length() ──▶ length(paris)
@@ -31,9 +38,11 @@ TypeScript runs directly through `tsx` — there is no build step.
 
 ## The model
 
-*This section and **Opinions** below it are what the code answers to: where they
-and the code disagree, the code is wrong. Everything after that — layers,
-scenarios, viewer — is description, and describes only today.*
+*This section and **Opinions** below it are where the reasoning lives. When they
+and the code disagree, one of the two has moved without the other — worth
+stopping to find out which, rather than assuming the code is right. Everything
+after that — layers, scenarios, viewer — is description, and describes only
+today.*
 
 One `Node` class. **Value** and **Application** are *roles read off structure*,
 never type tags:
@@ -43,7 +52,9 @@ never type tags:
 | **Value** | a referenceable thing — a datum *or* a function | many | `"5"`, `"paris"`, `"length()"` |
 | **Application** | one specific call | exactly one | `"length(paris)"` |
 
-Nine guarantees hold the model together:
+Nine findings hold the model together. They are called guarantees because the
+kernel currently keeps them and much of the design leans on their holding — not
+because they were decided in advance:
 
 - **G1 — single output.** An Application has one output, unlimited inputs.
   Values are hubs and fan out freely.
@@ -62,14 +73,15 @@ Nine guarantees hold the model together:
 - **G7 — convergence is never engineered.** Things fuse because their strings
   are equal, never because code decided they are related. No keys, no schema, no
   matching rules — and two things failing to converge is equally correct.
-- **G8 — reversibility is absolute.** Every recorded computation can be walked
-  backwards. Nothing may be built that produces a result you cannot get back
-  from. This is the purpose, not a feature.
+- **G8 — reversibility is the point.** Every recorded computation can be walked
+  backwards, and nothing is worth building here that produces a result you
+  cannot get back from. This one is closest to load-bearing: give it up and the
+  project is a different project.
 - **G9 — record without judgment; select at read time.** Every path is qualified
   by the applications it crosses, so a meaningless path (`paris → length(paris) →
-  5 → suite #5`) is *identifiable* rather than absent. Nothing may be dropped,
-  merged away, or refused at write time for looking like noise. That is a
-  query's decision, and a query can only make it if the write kept it.
+  5 → suite #5`) is *identifiable* rather than absent. So nothing gets dropped,
+  merged away, or refused at write time for looking like noise — a query can
+  make that call later, but only if the write kept it.
 
 ### Calling
 
@@ -132,10 +144,40 @@ type for free, and a value can carry many types at once. See `scenarios/types.ts
 
 ## Opinions
 
-The guarantees are what the model cannot violate. These are what the layers above
-it have *decided* — and unlike the guarantees, they could have gone another way.
-They exist because an unopinionated core offers too many ways to say one thing,
-and a pile of equivalent options is what makes upper layers hard to design.
+### Two hats
+
+Two hats, and the guarantees and the opinions fit different ones. Wearing the
+**kernel builder** hat, G1–G9 are the shape of the thing being kept. Wearing the
+**kernel user** hat — writing a layer, a scenario, anything above `kernel.ts` —
+they are facts about the material, and what they leave undone becomes the user's
+job:
+
+| the kernel stays out of | which leaves the user to |
+|---|---|
+| holding more than one type (G4) | impose types — predicates, records, shapes |
+| returning more than one output per call (G1) | build many-ness deliberately, in two rungs |
+| relating anything (G3, G7) | choose functions that make the useful things collide |
+| supplying meaning (G6) | name things — from literals, or from the data |
+| selecting anything (G9) | select, and do it at query time |
+
+Reading a guarantee as an instruction to the user is the easy mistake. G6 says
+the engine supplies no meaning; it does not say "be data-driven."
+`record("|", ["emp","date"])` is a hardcoded field list and sits perfectly well
+with G6. Whether names come from literals or off a CSV header is a *user*
+question, and user questions are answered below, by opinion.
+
+Which is also why the user's side is so open. Constraining it would mean the
+kernel doing the constraining, and that is the one thing G4 gives up. The room
+above the kernel is what the guarantees buy — so that side gets opinions, which
+are meant to be argued with, rather than findings the kernel is holding steady.
+
+### The opinions
+
+These came out of building `scenarios/text.ts` several different ways and keeping
+the one that read best. They exist because an unopinionated core offers too many
+ways to say one thing, and a pile of equivalent options is what makes upper
+layers hard to design. Each could have gone another way, and any of them is fair
+game to reopen — they are conclusions from a handful of experiments, not results.
 
 - **O1 — the list is the collection.** A `|`-joined string is the one
   representation of many-ness. Not arrays, not indices, not nested handles.
@@ -143,23 +185,24 @@ and a pile of equivalent options is what makes upper layers hard to design.
   (one application, one output — G1 satisfied rather than worked around), then
   take members out of the list by content. `sequence` in `shapes.ts` is both
   rungs.
-- **O3 — positions may be named, never counted.** `record` names a fixed, known
-  set of slots, so `lastOctet` is legitimate. Nothing may invent `0, 1, 2…` for a
-  count it does not know in advance.
+- **O3 — name positions, don't count them.** `record` names a fixed, known set
+  of slots, so `lastOctet` is fine. Inventing `0, 1, 2…` for a count you don't
+  know in advance is the move this avoids — see `scenarios/text-index.ts` for
+  what it looks like.
 - **O4 — no synthetic values.** Every argument to an application is data, or a
   node the graph already made. A value node that exists only as bookkeeping is a
-  defect.
+  smell — it means something outside the data is being represented inside it.
 - **O5 — a record is a list with named slots.** `record` and `sequence` are two
   access modes over one substrate: name the slots, or take members by content.
-- **O6 — depth is discovered, not declared.** Nothing hardcodes how many levels
-  a source has. Keep cutting until a cut yields no parts, or yields back its own
+- **O6 — depth is discovered, not declared.** Don't hardcode how many levels a
+  source has. Keep cutting until a cut yields no parts, or yields back its own
   input — that is the bottom, and the model already signals it. `document →
   chapters → sections → paragraphs → sentences → words` and `source → rows →
   fields` are one procedure at two depths, not two procedures.
 
-The deletion that enforces O2 and O3: `graph.ts` has no `chop`. Counting a cut
-is the one way of saying it that the opinions refuse, so the method does not
-exist. `scenarios/text-index.ts` writes the counting loop out by hand, on
+O2 and O3 were made real by a deletion: `graph.ts` has no `chop`. Counting a cut
+was the one way of saying it these opinions rule out, so the method went away
+rather than sitting there as a tempting alternative. `scenarios/text-index.ts` writes the counting loop out by hand, on
 purpose, as the shape to avoid.
 
 ## Layers
