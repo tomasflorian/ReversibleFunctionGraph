@@ -3,7 +3,7 @@
 # Works from anywhere: runs from the project directory so relative imports resolve.
 #
 #   ./show.sh path      # names / CSV / endpoints
-#   ./show.sh dense     # anagram + IP parsing
+#   ./show.sh hubs      # many functions over few values
 #
 # With no argument (or an unknown one), lists the available scenarios.
 # If a graph.html tab is already open, reload it after the run instead.

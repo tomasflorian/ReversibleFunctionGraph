@@ -25,7 +25,7 @@ banner() {
 }
 
 # ---- batch scenarios (print and exit) --------------------------------------
-for s in basic dense flat types path text text-index timesheet general-demo; do
+for s in basic hubs flat types path text text-index timesheet general-demo; do
   banner "scenario: $s"
   npx tsx "scenarios/$s.ts" >> "$LOG" 2>&1 \
     || echo "  [exited non-zero]" >> "$LOG"

@@ -29,7 +29,7 @@ addressable. `length(paris)` is the **application**: the reified call.
 ```sh
 npm install
 ./run.sh basic       # run a scenario, print output, regenerate data.js
-./show.sh dense      # same, then open the interactive viewer
+./show.sh hubs       # same, then open the interactive viewer
 ./run.sh             # list all scenarios
 ```
 
@@ -250,14 +250,15 @@ they check, so they can't be peeled off without weakening them.
 | scenario | shows |
 |---|---|
 | `basic` | The core moves — forward apply, chaining, reverse walks, function addressability. |
-| `dense` | Two experiments: an anagram family packed as dense as possible (no dead ends at all), then a foreign IP record bolted on to spoil it — which stays sparse, yet still fuses at `"3"`. |
+| `hubs` | A small set of words run through a lot of functions, to see what a hub-heavy graph looks like. An IP record is parsed alongside it, for a shape that shares almost nothing with the rest. |
 | `flat` | Functions calling functions — nested but flat — plus `NOTHING`, with counters proving memoization and that downstream never runs on a failed value. |
 | `types` | Types are discovered, not declared: a type is the extension of a predicate, readable both ways (value → its types, type → its members). |
 | `path` | Two ingestion methods that *don't* converge — they are separate islands, because the data names the fields, not the code. Dedup still bites inside method 1: `"robert smith"` and `"smith, robert"` land on the same `robert`. |
 | `text` | Cutting prose three levels deep in two rungs per level: `cut` joins the pieces into one `\|`-list value, then a per-level extraction (`paragraph`, `sentence`, `word`) takes members out of it. The driver splits nothing itself — every piece comes off a list the graph computed — and order becomes an addressable node rather than something recovered from the container. |
-| `text-index` | **Kept deliberately as the shape to avoid.** The same cut keyed by position via `chop()`: it works, but manufactures integer value nodes that fuse across unrelated cuts, so the node `"1"` ends up being both a position and a word. Do not "fix" this one — compare its picture to `text`. |
+| `text-index` | **Kept deliberately as the shape to avoid.** The same cut keyed by position, counting `0, 1, 2…` until nothing comes back. It works, but manufactures integer value nodes that fuse across unrelated cuts, so the node `"1"` ends up being both a position and a word. Do not "fix" this one — compare its picture to `text`. |
 | `timesheet` | A real app: no mutable cell. An edit is an append; "current" is a latest-wins query; history stays walkable. |
 | `timesheet-cli` | The same, interactive, built on `shapes.ts`. Edit chains instead of sequence numbers. |
+| `general-demo` | Six sources — prose, headered CSV, unheadered CSV, grouped CSV, JSON, and a `key: value` format — parsed by one technique. The splitter changes; the shape never does. Every leaf climbs back to the source it came from, and `"paris"` arrives as a single node from all six. |
 
 Two interactive CLIs:
 

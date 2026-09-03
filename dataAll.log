@@ -18,7 +18,7 @@ cut = a|r|c
 rendered 35 nodes, 36 edges -> data.js
 
 ════════════════════════════════════════════════════════════════════════
-  scenario: dense
+  scenario: hubs
 ════════════════════════════════════════════════════════════════════════
 
 rendered 148 nodes, 338 edges -> data.js
