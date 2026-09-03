@@ -100,6 +100,45 @@ rendered 31 nodes, 48 edges -> data.js
 rendered 56 nodes, 65 edges -> data.js
 
 ════════════════════════════════════════════════════════════════════════
+  scenario: text
+════════════════════════════════════════════════════════════════════════
+
+=== THE CUT: three levels, all by position ===
+   paragraphs: 3
+   sentences:  5 (5 distinct)
+   words:      21 (9 distinct)
+
+=== FORWARD: a paragraph's sentences, in order ===
+   paris is a city
+   the city is old
+
+=== BACK TO THE SOURCE: one word, up to the raw text ===
+   word      "old"
+   sentence  the city is old
+   paragraph paris is a city / the city is old
+   document  paris is a city / the city is old /  / tokyo is a city / the city is new /  / a city is a place
+
+=== DEDUP: one node per string, keeping every producer ===
+   "city" is one node, produced by 5 applications
+     paris is a city
+     the city is old
+     tokyo is a city
+     the city is new
+     a city is a place
+   "a" appears twice in one sentence, so that sentence is listed twice:
+     paris is a city
+     tokyo is a city
+     a city is a place
+     a city is a place
+
+=== THE SINGLE-CHILD CASE ===
+   paragraph          a city is a place
+   its only sentence  a city is a place
+   same node?         true
+   so sentence(p,0) points back at its own input — a 2-cycle, visible in the viewer.
+rendered 55 nodes, 116 edges -> data.js
+
+════════════════════════════════════════════════════════════════════════
   scenario: timesheet
 ════════════════════════════════════════════════════════════════════════
 
