@@ -52,7 +52,7 @@ never type tags:
 | **Value** | a referenceable thing — a datum *or* a function | many | `"5"`, `"paris"`, `"length()"` |
 | **Application** | one specific call | exactly one | `"length(paris)"` |
 
-Nine findings hold the model together. They are called guarantees because the
+Ten findings hold the model together. They are called guarantees because the
 kernel currently keeps them and much of the design leans on their holding — not
 because they were decided in advance:
 
@@ -82,6 +82,17 @@ because they were decided in advance:
   5 → suite #5`) is *identifiable* rather than absent. So nothing gets dropped,
   merged away, or refused at write time for looking like noise — a query can
   make that call later, but only if the write kept it.
+- **G10 — depth is not pre-determined.** Every edge crosses value ↔
+  application, so no application ever points at another: a nested call is two
+  applications side by side, never one inside the other. Levels are not stored
+  anywhere, only walked — whatever depth exists emerged from what was ingested.
+  It can also grow later, in either direction, without disturbing what is
+  already there: a further cut adds a level below, and a source that turns out
+  to be part of something larger gains one above. So the bottom of a cut is
+  something the model signals — `NOTHING`, or a cut that returns its own input —
+  rather than something code can know in advance. `document → chapters →
+  sections → paragraphs → sentences → words` and `source → rows → fields` are
+  one procedure at two depths, not two procedures.
 
 ### Calling
 
@@ -179,6 +190,14 @@ ways to say one thing, and a pile of equivalent options is what makes upper
 layers hard to design. Each could have gone another way, and any of them is fair
 game to reopen — they are conclusions from a handful of experiments, not results.
 
+The line between the two lists: an opinion decides what gets stored, a guarantee
+describes what the store can hold. That yields a rough check rather than a rule.
+If a rule leaves the graph byte-identical whichever way it goes, it is not
+deciding what gets stored — so it is worth asking what it *is* doing. Sometimes
+the answer is that the model already settles it and the rule was describing the
+model all along, which is how the old depth opinion became G10. Sometimes the
+answer is that it is a matter of taste, and belongs in neither list.
+
 - **O1 — the list is the collection.** A `|`-joined string is the one
   representation of many-ness. Not arrays, not indices, not nested handles.
 - **O2 — one becomes many in two rungs.** First cut the container into a list
@@ -194,11 +213,6 @@ game to reopen — they are conclusions from a handful of experiments, not resul
   smell — it means something outside the data is being represented inside it.
 - **O5 — a record is a list with named slots.** `record` and `sequence` are two
   access modes over one substrate: name the slots, or take members by content.
-- **O6 — depth is discovered, not declared.** Don't hardcode how many levels a
-  source has. Keep cutting until a cut yields no parts, or yields back its own
-  input — that is the bottom, and the model already signals it. `document →
-  chapters → sections → paragraphs → sentences → words` and `source → rows →
-  fields` are one procedure at two depths, not two procedures.
 
 O2 and O3 were made real by a deletion: `graph.ts` has no `chop`. Counting a cut
 was the one way of saying it these opinions rule out, so the method went away
@@ -222,8 +236,9 @@ The two guards live in the kernel on purpose: `apply` is what assigns the roles
 they check, so they can't be peeled off without weakening them.
 
 - **Guard 1 — role.** A node is a value or an application, never both.
-- **Guard 2 — bipartite.** Every edge crosses value ↔ application. No
-  application ever points at another application; nesting stays *flat*.
+- **Guard 2 — bipartite.** Every edge crosses value ↔ application. This is
+  where G10 is enforced: no application ever points at another, so nesting stays
+  *flat*.
 
 ## Scenarios
 
