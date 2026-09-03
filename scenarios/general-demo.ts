@@ -31,41 +31,46 @@ nation: france
 name: tokyo
 nation: japan`;
 
+g.def("hasFormat", (_raw, name) => name);
+const tag = (raw: string, format: string) => g.node(raw).apply("hasFormat", format);
+
 // ---------------------------------------------------------------- raw text
 const Paragraphs = sequence("cutParagraphs", "paragraph", t => t.split("\n\n"));
 const Sentences  = sequence("cutSentences",  "sentence",  p => p.split("\n"));
 const Words      = sequence("cutWords",      "word",      s => s.split(" "));
 
+tag(prose, "prose");
 for (const p of Paragraphs.of(prose))
   for (const s of Sentences.of(p.value))
     Words.of(s.value);
 
 // ------------------------------------------------------------ headered CSV
-const Rows = sequence("cutRows", "row", c => c.split("\n").slice(1));
+const Rows   = sequence("cutRows", "row", c => c.split("\n").slice(1));
 const Person = record(",", headered.split("\n")[0].split(","));
 
+tag(headered, "headered-csv");
 for (const r of Rows.of(headered)) Person.of(r.value);
 
 // ---------------------------------------------------------- unheadered CSV
 const Lines  = sequence("cutLines",  "line",  c => c.split("\n"));
 const Fields = sequence("cutFields", "field", l => l.split(","));
 
+tag(bare, "bare-csv");
 for (const l of Lines.of(bare)) Fields.of(l.value);
 
+// --------------------------------------------------------- sub grouped bare
+const GroupedLines  = sequence("cutGroupedLines",  "groupedLine",  c => c.split("\n"));
+const GroupedFields = sequence("cutGroupedFields", "groupedField", l => l.split(":"));
 
-// ---------------------------------------------------------- sub grouped bare
-const SubGroupedLines  = sequence("cutGroupedLines",  "groupedLine",  c => c.split("\n"));
-const SubGroupedFields = sequence("cutGroupedFields", "groupedField", l => l.split(":"));
-
-for (const l of SubGroupedLines.of(subGroupedBare)) SubGroupedFields.of(l.value);
-
+tag(subGroupedBare, "grouped");
+for (const l of GroupedLines.of(subGroupedBare)) GroupedFields.of(l.value);
 
 // --------------------------------------------------------------------- JSON
 const Items = sequence("cutItems", "item", j => JSON.parse(j).map((o: unknown) => JSON.stringify(o)));
-
 const items = Items.of(json);
 const jsonKeys = [...new Set(items.flatMap(i => Object.keys(JSON.parse(i.value))))];
 
+tag(json, "json");
 for (const key of jsonKeys)
   g.def(key, s => (JSON.parse(s) as Record<string, string>)[key] ?? null);
 for (const item of items) for (const key of jsonKeys) item.apply(key);
@@ -73,10 +78,10 @@ for (const item of items) for (const key of jsonKeys) item.apply(key);
 // ------------------------------------------------------ custom "key: value"
 const Blocks = sequence("cutBlocks", "block", t => t.split("\n\n"));
 const Pairs  = sequence("cutPairs",  "pair",  b => b.split("\n"));
-
-const pairs = Blocks.of(config).flatMap(b => Pairs.of(b.value));
+const pairs  = Blocks.of(config).flatMap(b => Pairs.of(b.value));
 const cfgKeys = [...new Set(pairs.map(p => p.value.split(": ")[0]))];
 
+tag(config, "key-value");
 for (const key of cfgKeys) g.def(key, s => s.split(": ")[1] ?? null);
 for (const p of pairs) p.apply(p.value.split(": ")[0]);
 
@@ -88,17 +93,18 @@ const short = (s: string) => {
   return flat.length > 40 ? flat.slice(0, 37) + "..." : flat;
 };
 
-console.log("=== five sources, one technique ===");
+console.log("=== six sources, one technique ===");
 const sources: [string, string, string][] = [
   ["raw text",       prose,    "cutParagraphs"],
   ["headered CSV",   headered, "cutRows"],
   ["unheadered CSV", bare,     "cutLines"],
+  ["grouped CSV",    subGroupedBare, "cutGroupedLines"],
   ["JSON",           json,     "cutItems"],
   ["key: value",     config,   "cutBlocks"],
 ];
 for (const [name, raw, cut] of sources) {
   const list = g.node(raw).apply(cut).value;
-  console.log("   " + name.padEnd(16) + cut.padEnd(15) + list.split("|").length + " members");
+  console.log("   " + name.padEnd(16) + cut.padEnd(17) + list.split("|").length + " members");
 }
 
 console.log("\n=== every leaf climbs back to its own source ===");
@@ -120,9 +126,13 @@ climb("2.35,48.85", ["groupedField", "cutGroupedFields", "groupedLine", "cutGrou
 climb("sumida", ["river", "item", "cutItems"]);
 climb("japan",  ["nation", "pair", "cutPairs", "block", "cutBlocks"]);
 
-console.log("=== the vocabulary the sources taught the graph ===");
+console.log("=== each format recorded what it is, in the graph ===");
+for (const f of ["prose", "headered-csv", "bare-csv", "grouped", "json", "key-value"])
+  console.log("   " + f.padEnd(14) + short(back(f, "hasFormat")[0] ?? "(none)"));
+
+console.log("\n=== the vocabulary the sources taught the graph ===");
 for (const fn of ["city", "country", "place", "river", "name", "nation", "field", "groupedField"])
-  console.log("   " + (fn + "()").padEnd(12) + (g.outputsOf(fn).join("  ") || "(nothing)"));
+  console.log("   " + (fn + "()").padEnd(16) + (g.outputsOf(fn).join("  ") || "(nothing)"));
 console.log("   country() and nation() mean the same thing and stay apart:");
 console.log("     the data named them differently, so nothing fuses them.");
 console.log("   field() is anonymous — the unheadered CSV named nothing,");

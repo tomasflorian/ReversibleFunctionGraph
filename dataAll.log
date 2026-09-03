@@ -206,13 +206,14 @@ rendered 41 nodes, 60 edges -> data.js
   scenario: general-demo
 ════════════════════════════════════════════════════════════════════════
 
-rendered 157 nodes, 258 edges -> data.js
-=== five sources, one technique ===
-   raw text        cutParagraphs  2 members
-   headered CSV    cutRows        2 members
-   unheadered CSV  cutLines       2 members
-   JSON            cutItems       2 members
-   key: value      cutBlocks      2 members
+rendered 170 nodes, 282 edges -> data.js
+=== six sources, one technique ===
+   raw text        cutParagraphs    2 members
+   headered CSV    cutRows          2 members
+   unheadered CSV  cutLines         2 members
+   grouped CSV     cutGroupedLines  2 members
+   JSON            cutItems         2 members
+   key: value      cutBlocks        2 members
 
 === every leaf climbs back to its own source ===
    leaf            seine
@@ -252,15 +253,23 @@ rendered 157 nodes, 258 edges -> data.js
    block            name: paris / nation: france|name: to...
    cutBlocks        name: paris / nation: france /  / nam...
 
+=== each format recorded what it is, in the graph ===
+   prose         paris sits on the seine / tokyo sits ...
+   headered-csv  city,country / paris,france / tokyo,j...
+   bare-csv      paris,france,europe / tokyo,japan,asia
+   grouped       paris:2.35,48.85 / tokyo:139.69,35.68
+   json          [{"place":"paris","river":"seine"},{"...
+   key-value     name: paris / nation: france /  / nam...
+
 === the vocabulary the sources taught the graph ===
-   city()      paris  tokyo
-   country()   france  japan
-   place()     paris  tokyo
-   river()     seine  sumida
-   name()      paris  tokyo
-   nation()    france  japan
-   field()     paris  france  europe  tokyo  japan  asia
-   groupedField()paris  2.35,48.85  tokyo  139.69,35.68
+   city()          paris  tokyo
+   country()       france  japan
+   place()         paris  tokyo
+   river()         seine  sumida
+   name()          paris  tokyo
+   nation()        france  japan
+   field()         paris  france  europe  tokyo  japan  asia
+   groupedField()  paris  2.35,48.85  tokyo  139.69,35.68
    country() and nation() mean the same thing and stay apart:
      the data named them differently, so nothing fuses them.
    field() is anonymous — the unheadered CSV named nothing,

@@ -208,6 +208,13 @@ game to reopen — they are conclusions from a handful of experiments, not resul
   thing with no separator at all. When nothing names them, cut to a list and
   take members by content. Records take the first way in, collections the
   second.
+- **O6 — a format is its splitters.** Grouping a format's splitters into a
+  function named after it is good: it scopes the names, makes the format
+  callable, and gives it a place to record what it knows about itself. What is
+  not allowed is a format body shaped differently from the others — converting
+  one format into another to reuse a path, or a caller that branches on format
+  to choose a procedure rather than a splitter chain. Read any two format
+  functions side by side and the only difference should be the lambdas.
 
 O2 and O3 were made real by a deletion: `graph.ts` has no `chop`. Counting a cut
 was the one way of saying it these opinions rule out, so the method went away
