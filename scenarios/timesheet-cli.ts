@@ -5,7 +5,6 @@ import * as readline from "node:readline";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const DATA = new URL("../data.js", import.meta.url);
 const HTML = fileURLToPath(new URL("../graph.html", import.meta.url));
 
 const g = new Graph();
@@ -28,14 +27,14 @@ function addEntry(emp: string, date: string, proj: string, hours: string): void 
   const rec = Entry.make(emp, date, proj, hours);
   Entry.of(rec); Day.of(Entry.read(rec, "date"));
   log.push(rec);
-  renderData(g, DATA);
+  renderData(g);
   console.log(`  added: ${rec}`);
 }
 
 function editAny(oldRaw: string, newRaw: string): void {
   if (oldRaw === newRaw) { console.log("  no change"); return; }
   edit.apply(oldRaw, newRaw);
-  renderData(g, DATA);
+  renderData(g);
   console.log(`  edited: ${oldRaw}  ->  ${newRaw}`);
 }
 
@@ -70,7 +69,7 @@ function history(node: string): void {
 }
 
 function openBrowser(): void {
-  renderData(g, DATA);
+  renderData(g);
   execFile("xdg-open", [HTML], err => { if (err) console.log(`  (open ${HTML} yourself)`); });
   console.log(`  opened ${HTML} — reload after each add/edit`);
 }
@@ -123,6 +122,12 @@ addEntry("alice", "2026-11-25", "projX", "11");
 addEntry("bob",   "2026-12-26", "projX", "4");
 addEntry("carol", "2026-08-26", "projY", "7");
 addEntry("alice", "2026-08-26", "projX", "12");
+// Seeded edits, so the versioned shape is in the picture on first open: one
+// record revised twice (a run of three) and one revised once (a run of two).
+editAny("bob|2026-08-25|projX|8",   "bob|2026-08-25|projX|6");
+editAny("bob|2026-08-25|projX|6",   "bob|2026-08-25|projZ|6");
+editAny("carol|2026-08-26|projY|7", "carol|2026-08-26|projY|9");
+
 console.log("\ntimesheet — copy a raw row from `list` and edit it (any part):");
 console.log("  edit bob|2026-08-25|projX|8 -> bob|2026-08-25|projZ|6\n");
 

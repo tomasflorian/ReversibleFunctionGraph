@@ -1,6 +1,6 @@
 import { Graph } from "../graph.ts";
 import { shapes } from "../shapes.ts";
-import { renderData, snapshot } from "../view.ts";
+import { renderData } from "../view.ts";
 
 const g = new Graph();
 const { sequence } = shapes(g);
@@ -36,15 +36,6 @@ for (const ep of ["192.168.1.10:8080", "192.168.1.10:443", "10.0.0.5:22"]) {
   g.node(ep).apply("port");
 }
 
-const before = snapshot(g);
 for (const r of Rows.of(csv)) for (const name of cols) r.apply(name);
-const after = snapshot(g);
-
-console.log("\n=== METHOD 4: the same CSV, via sequence() ===");
-console.log("   rows found: " + Rows.of(csv).map(n => n.value).join("  |  "));
-console.log("   nodes " + before.nodes.length + " -> " + after.nodes.length +
-            "   edges " + before.edges.length + " -> " + after.edges.length +
-            (before.nodes.length === after.nodes.length &&
-             before.edges.length === after.edges.length ? "   (nothing new: faithful)" : "   (GREW — not faithful)"));
 
 renderData(g);

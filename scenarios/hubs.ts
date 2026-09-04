@@ -36,21 +36,7 @@ for (const w of words) {
   g.node(w).apply("upper").apply("length");
 }
 
+g.node("cat").apply("sort");
+g.node("cat").apply("reverse").apply("sort");
+
 renderData(g);
-
-console.log("\n=== biggest hubs (reverse = who produced this) ===");
-g.node("3").from().log('"3"               produced by =');
-g.node("true").from().log('hasLetter true    produced by =').values.length;
-g.node("art").from().log('sort -> "art"     produced by =');
-
-console.log("\n=== the same node is BOTH an output hub and an input hub ===");
-g.node("a").from().log('"a" is PRODUCED by (first/last) =');
-g.node("a").to().log('"a" is USED BY (hasLetter args)   =');
-
-console.log("\n=== function addressability: one hop to every call ===");
-g.node("sort()").to().log("sort() used in =");
-
-console.log("\n=== chain collapse: reverse.sort lands where sort already is ===");
-const viaSort    = g.node("cat").apply("sort");
-const viaReverse = g.node("cat").apply("reverse").apply("sort");
-console.log("same node?", viaSort === viaReverse, "->", viaSort.value);

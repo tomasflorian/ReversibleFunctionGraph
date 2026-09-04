@@ -1,11 +1,11 @@
-import { Graph } from "./graph.ts";
-import { renderData } from "./view.ts";
+import { Graph } from "../graph.ts";
+import { renderData } from "../view.ts";
+import { pivot, tables } from "../gaze.ts";
 import * as readline from "node:readline";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const DATA = new URL("./data.js", import.meta.url);
-const HTML = fileURLToPath(new URL("./graph.html", import.meta.url));
+const HTML = fileURLToPath(new URL("../graph.html", import.meta.url));
 const SEP = "\u0000";
 
 type Source = { kind: "json" | "csv"; raw: string };
@@ -56,27 +56,13 @@ function rebuild(): void {
     try { src.kind === "json" ? loadJSON(src.raw) : loadCSV(src.raw); }
     catch (err) { console.log(`  (skipped a bad ${src.kind} source: ${(err as Error).message})`); }
   }
-  renderData(g, DATA);
+  renderData(g);
 }
 
 function gazeTables(): void {
-  const cols = [...columns];
-  const cell = new Map<string, string>(), subjects: string[] = [], seen = new Set<string>();
-  for (const c of cols)
-    for (const app of g.node(c + "()").to().nodes) {
-      const subject = app.from().nodes[1]?.value;
-      if (subject === undefined) continue;
-      cell.set(subject + SEP + c, app.to().nodes[0]?.value ?? "");
-      if (!seen.has(subject)) { seen.add(subject); subjects.push(subject); }
-    }
-  const groups = new Map<string, { cols: string[]; rows: string[] }>();
-  for (const s of subjects) {
-    const sig = cols.filter(c => cell.has(s + SEP + c));
-    if (!sig.length) continue;
-    const key = sig.join(SEP);
-    (groups.get(key) ?? groups.set(key, { cols: sig, rows: [] }).get(key)!).rows.push(s);
-  }
-  const list = [...groups.values()].sort((a, b) => b.rows.length - a.rows.length);
+  const p = pivot(g);
+  const cell = new Map(p.cells.map(c => [c.s + SEP + c.c, c.res]));
+  const list = tables(p);
   if (!list.length) { console.log("  (no tables — load something first)"); return; }
   console.log(`  ${list.length} table(s) reconstructed from the graph:`);
   list.forEach((grp, i) => {
@@ -95,7 +81,7 @@ function sourcesList(): void {
 }
 
 function openBrowser(): void {
-  renderData(g, DATA);
+  renderData(g);
   execFile("xdg-open", [HTML], err => { if (err) console.log(`  (open ${HTML} yourself)`); });
   console.log(`  opened ${HTML} — reload after each change`);
 }

@@ -30,25 +30,7 @@ const values = [
 ];
 for (const v of values) for (const p of predicates) g.node(v).apply(p);
 
-const nameOf   = (app: string) => app.slice(0, app.indexOf("("));
-const typesOf  = (v: string) => [...new Set(g.node(v).from().values.map(nameOf))];
-
-console.log("=== VALUE → its types (how many types does this string carry?) ===");
-for (const v of values) {
-  const t = typesOf(v);
-  console.log(`  ${v.padEnd(14)} → ${t.length}: [${t.join(", ")}]`);
-}
-
-console.log("\n=== TYPE → its members (the extension of each predicate) ===");
-for (const p of ["isInternalIP", "isIP", "isHost", "isString"]) {
-  const m = g.outputsOf(p);
-  console.log(`  ${p.padEnd(14)} = {${m.join(", ")}}`);
-}
-
-console.log("\n=== NO TYPE yet — until you ask ===");
 g.node("mystery-blob");
-console.log("  mystery-blob →", typesOf("mystery-blob"), "  (nobody asked)");
 for (const p of predicates) g.node("mystery-blob").apply(p);
-console.log("  mystery-blob →", typesOf("mystery-blob"), "  (after asking: just a string)");
 
 renderData(g);

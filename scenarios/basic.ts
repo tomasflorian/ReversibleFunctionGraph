@@ -14,21 +14,12 @@ for (const city of ["paris", "tokyo"]) {
   g.node(city).apply("upper");
 }
 
-g.node("paris france").apply("cutWords").log("cutWords =");
+g.node("paris france").apply("cutWords");
 g.node("paris").apply("cut");
 
-g.node("paris").apply("length").log("paris.length =");
-g.node("paris").apply("upper").log("paris.upper  =");
+g.node("paris").apply("length");
+g.node("paris").apply("upper");
 
-g.node("5").from().log("produced 5 =");
-g.node("5").from().from().log("their inputs =");
-
-console.log("as strings:", g.node("5").from().values);
-
-g.node("p").from().log("starts with p =");
-
-g.node("length()").to().log("length used in =");
-
-for (const w of ["lima", "bat", "cat", "arc"]) g.node(w).apply("cut").log("cut =");
+for (const w of ["lima", "bat", "cat", "arc"]) g.node(w).apply("cut");
 
 renderData(g);

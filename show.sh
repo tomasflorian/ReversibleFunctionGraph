@@ -18,10 +18,16 @@ list() {
     [ -e "$f" ] || continue
     echo "  - $(basename "$f" .ts)"
   done
+  echo "anti-scenarios (they work; they are not how to do it):"
+  for f in "$here"/anti-scenarios/*.ts; do
+    [ -e "$f" ] || continue
+    echo "  - $(basename "$f" .ts)"
+  done
 }
 
 name="${1:-}"
 rel="scenarios/$name.ts"
+[ -f "$here/$rel" ] || rel="anti-scenarios/$name.ts"
 
 if [ -z "$name" ] || [ ! -f "$here/$rel" ]; then
   [ -n "$name" ] && echo "unknown scenario: $name" >&2

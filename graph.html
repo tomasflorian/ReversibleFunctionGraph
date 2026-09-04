@@ -64,6 +64,11 @@
     .tbl-block h3 { color: #dd6b20; }
     .pathrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
                padding: 6px 0; border-bottom: 1px solid #1e1e1e; }
+    .pathrow.selrow { background: #2a2216; border-radius: 6px; }
+    .tip .node { outline: 1px solid #dd6b20; }
+    .listing { padding: 6px 0; border-bottom: 1px solid #1e1e1e; border-radius: 6px; }
+    .listing .lfrom { color: #888; }
+    .listing .litems { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 18px; }
     .node.static { cursor: default; }
     .node.static:hover { background: none; }
     .morebtn { margin-top: 12px; background: #2a2a2a; color: #ddd; border: 1px solid #555;
@@ -103,6 +108,7 @@
         <button class="tab on" data-view="triples">triples</button>
         <button class="tab" data-view="table">table</button>
         <button class="tab" data-view="tables">tables</button>
+        <button class="tab" data-view="links">links</button>
         <button class="tab" data-view="paths">paths</button>
       </div>
       <div id="view"></div>
@@ -244,29 +250,16 @@
       // function (with any extra args folded into the column name), cell = result.
       // Built straight from structure — each Application's from()=[fn,args],
       // to()=result — no string parsing. dedup means every cell is already unique.
+      // The pivot and the tables are GAZED IN TS (gaze.ts) and shipped in data.js.
+      // They are not rebuilt here: an application's inputs are [fn(), arg0, arg1...]
+      // in that order, and a flat edge list cannot preserve it — guessing the
+      // subject by edge position mis-attributed every multi-argument call.
       const SEP = "\u0000";
-      function buildPivot() {
-        const cell = new Map();                 // `subject SEP col` -> { res, app }
-        const subjects = [], columns = [], seenS = new Set(), seenC = new Set();
-        for (const n of data.nodes) {
-          if (n.role !== "application") continue;
-          const inputs  = network.getConnectedNodes(n.id, "from");
-          const fnNode  = inputs.find(x => roleOf.get(x) === "function");
-          const dataIns = inputs.filter(x => roleOf.get(x) !== "function"); // [arg0, arg1…]
-          if (!fnNode || dataIns.length === 0) continue;
-          const fnName  = fnNode.replace(/\(\)$/, "");
-          const subject = dataIns[0];
-          const extra   = dataIns.slice(1);
-          const col = extra.length ? `${fnName}(·,${extra.join(",")})` : fnName;
-          const res = network.getConnectedNodes(n.id, "to")[0];
-          cell.set(subject + SEP + col, { res, app: n.id });
-          if (!seenS.has(subject)) { seenS.add(subject); subjects.push(subject); }
-          if (!seenC.has(col))     { seenC.add(col);     columns.push(col); }
-        }
-        subjects.sort(); columns.sort();
-        return { subjects, columns, cell };
-      }
-      const pivot = buildPivot();
+      const pivot = (() => {
+        const cell = new Map();
+        for (const c of data.pivot.cells) cell.set(c.s + SEP + c.c, { res: c.res, app: c.app });
+        return { subjects: data.pivot.subjects, columns: data.pivot.columns, cell };
+      })();
 
       // sort state: which column, which direction. col null => subjects A→Z.
       let sort = { col: null, dir: 1 };
@@ -315,23 +308,8 @@
       }
 
       // TAB 3 — TABLES (one universal table, split into relations) ------------
-      // Group rows by their COLUMN-SIGNATURE (which columns they have a value in).
-      // Each group is a dense table — a relation recovered from the sparse pivot.
-      // (Blanks are treated as "no value here"; see the materialization caveat.)
-      function buildTables() {
-        const { subjects, columns, cell } = pivot;
-        const groups = new Map(); // sigKey -> { cols: string[], rows: string[] }
-        for (const s of subjects) {
-          const cols = columns.filter(c => cell.has(s + SEP + c)); // this row's signature
-          if (cols.length === 0) continue;
-          const key = cols.join(SEP);
-          if (!groups.has(key)) groups.set(key, { cols, rows: [] });
-          groups.get(key).rows.push(s);
-        }
-        // biggest tables first (most rows), then most columns
-        return [...groups.values()].sort((a, b) =>
-          b.rows.length - a.rows.length || b.cols.length - a.cols.length);
-      }
+      // Rows grouped by column-signature — gazed in TS, shipped ready to draw.
+      function buildTables() { return data.tables; }
 
       function renderTables(selId) {
         const { cell } = pivot;
@@ -355,6 +333,50 @@
           }
           h += `</tbody></table></div></div>`;
         });
+        return h;
+      }
+
+      // TAB 4 — LINKS (calls that hand back one of their own arguments) -------
+      // Gazed in TS (gaze.ts). Such a call computes nothing; it leaves an edge
+      // between two values that already existed. Per relation the edges lie one
+      // of two ways, and the graph says which: they COMPOSE (a chain — the
+      // result is the subject of the next such call) or they FAN OUT (a listing
+      // — a subject and its members). Both are drawn here; they are one read.
+      function renderLinks(selId) {
+        const chains = data.chains || [], listings = data.listings || [];
+        if (!chains.length && !listings.length)
+          return `<div class="hint">no links in this graph — every function here computes ` +
+                 `a new value rather than handing back one of its own arguments.</div>`;
+
+        const group = (xs, key) => {
+          const m = new Map();
+          for (const x of xs) (m.get(x[key]) || m.set(x[key], []).get(x[key])).push(x);
+          return m;
+        };
+        let h = `<div class="hint">${chains.length} chain(s), ${listings.length} listing(s)</div>`;
+
+        for (const [fn, cs] of group(chains, "fn")) {
+          h += `<div class="tbl-block"><h3>${esc(fn)} · chain · ${cs.length}</h3>`;
+          for (const c of cs) {
+            const on = c.nodes.includes(selId);
+            h += `<div class="pathrow${on ? " selrow" : ""}">` +
+              c.nodes.map((n, i) =>
+                i === c.nodes.length - 1 ? `<span class="tip">${chip(n)}</span>` : chip(n))
+               .join(`<span class="arrow">→</span>`) + `</div>`;
+          }
+          h += `</div>`;
+        }
+
+        for (const [fn, ls] of group(listings, "fn")) {
+          h += `<div class="tbl-block"><h3>${esc(fn)} · listing · ${ls.length}</h3>`;
+          for (const l of ls) {
+            const on = l.from === selId || l.items.includes(selId);
+            h += `<div class="listing${on ? " selrow" : ""}">` +
+                 `<div class="lfrom">${chip(l.from)}</div>` +
+                 `<div class="litems">${l.items.map(chip).join("")}</div></div>`;
+          }
+          h += `</div>`;
+        }
         return h;
       }
 
@@ -421,6 +443,7 @@
         viewEl.innerHTML =
           view === "table"  ? renderTable(id)  :
           view === "tables" ? renderTables(id) :
+          view === "links"  ? renderLinks(id)  :
           view === "paths"  ? renderPathsView() :
                               renderTriples(id);
       }
