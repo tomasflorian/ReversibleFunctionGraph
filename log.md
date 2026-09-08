@@ -107,3 +107,37 @@ anything reading the separator afterwards, was sketched and not built.
 > not handle it in the graph? Whenever something comes out with a `|` in it,
 > link it automatically. Then I get the listings by going to the triples and
 > clicking `isListing()`. Or what am I missing?
+
+---
+
+## Giving every producer its own function names
+
+**Tried.** Two producers can write the same call with two different answers —
+`["length","cat","3"]` and `["length","cat","7"]` — and nothing anywhere can tell
+which is right, because the pile has no vocabulary and never runs a function. The
+idea was to make it impossible: give each producer an id and prefix every
+function name with it, so `acme_length` and `bolt_length` are different functions
+and no two producers ever write the same call.
+
+**What came out.** Set down before it was built. It works, and that is the
+problem with it: the disagreement does not go away, it stops being visible. Two
+calls sit in the merged graph with two answers, no fork, and nothing in the
+picture saying anyone disagreed. It also costs the thing the project is for —
+`length` is one node with every use of length hanging off it, and prefixing turns
+a thousand merged files into a thousand `length` nodes. Value collisions survive;
+function collisions stop happening. And the id has to be a chosen, stable name
+rather than a per-run uuid, or re-running a producer twice gives a disjoint
+second copy of everything — which makes it a namespace a person picks, not an
+identifier.
+
+Left as: assume no producer ever conflicts. Nothing checks. If two answers ever
+do arrive, the call node gets two arrows out and the picture shows a fork, which
+is both what happens by default and the more honest of the two options. If
+namespaces come back they should be optional and chosen, not mandatory.
+
+> what if each producer had unique id and function names were id_x()? that way
+> there is never any conflict?
+>
+> we assume something insane, but we know that it's insane .. no producers will
+> ever conflict .. we leave it as a todo so that this doesn't stop us from the
+> refactor

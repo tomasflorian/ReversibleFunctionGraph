@@ -1,27 +1,12 @@
 #!/usr/bin/env bash
-# run.sh <scenario> — run a scenario, regenerating data.js (no viewer).
-# Works from anywhere: runs from the project directory so relative imports resolve.
+# run.sh — run the producer and send its atoms to the pile.
 #
-#   ./run.sh path
+#   npm start      # in one terminal: the pile, at http://localhost:8000
+#   ./run.sh       # in another: produce, and watch the picture fill in
 #
-# With no argument (or an unknown one), lists the available scenarios.
+# The pile keeps what it is given, so running this twice adds nothing the second
+# time — merging is idempotent, and re-sending everything is free by design.
+# Point somewhere else with RFG_PILE.
 set -e
-
-here="$(cd "$(dirname "$0")" && pwd)"
-cd "$here"
-
-name="${1:-}"
-rel="scenarios/$name.ts"
-[ -f "$here/$rel" ] || rel="anti-scenarios/$name.ts"
-
-if [ -z "$name" ] || [ ! -f "$here/$rel" ]; then
-  [ -n "$name" ] && echo "unknown scenario: $name" >&2
-  echo "usage: $(basename "$0") <scenario>" >&2
-  echo "scenarios:" >&2
-  for f in "$here"/scenarios/*.ts; do [ -e "$f" ] || continue; echo "  - $(basename "$f" .ts)" >&2; done
-  echo "anti-scenarios (they work; they are not how to do it):" >&2
-  for f in "$here"/anti-scenarios/*.ts; do [ -e "$f" ] || continue; echo "  - $(basename "$f" .ts)" >&2; done
-  exit 1
-fi
-
-npx tsx "$rel"
+cd "$(cd "$(dirname "$0")" && pwd)"
+npx tsx scenarios/combined.ts

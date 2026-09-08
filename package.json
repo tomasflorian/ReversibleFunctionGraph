@@ -2,16 +2,21 @@
   "name": "attempt2026-reversiblefunctiongraph",
   "version": "1.0.0",
   "description": "",
-  "main": "data.js",
+  "main": "pile.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "npx tsx pile.ts",
+    "build": "npx tsc",
+    "snapshot": "./runAll.sh",
+    "produce": "./run.sh"
   },
   "keywords": [],
   "author": "",
   "license": "UNLICENSED",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "devDependencies": {
-    "tsx": "^4.23.13"
+    "@types/node": "^26.5.0",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
   }
 }
