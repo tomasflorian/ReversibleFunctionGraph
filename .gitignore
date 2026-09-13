@@ -2,6 +2,7 @@ node_modules/**
 local/**
 atoms.txt
 pile.atoms
+*.atoms.lock
 dist/
-producers/timesheet/bin/
-producers/timesheet/obj/
+producers/**/bin/
+producers/**/obj/

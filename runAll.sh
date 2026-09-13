@@ -13,7 +13,7 @@
 # nothing here can go stale and no grouping decision is baked in. It is the same
 # file the viewer fetches, so it is also directly viewable:
 #
-#   curl -X POST --data-binary @snapshots/combined.atoms localhost:8000/atoms
+#   cp snapshots/combined.atoms pile.atoms
 #
 # Stdout is discarded. The graph does not narrate; the picture is the report.
 set -e

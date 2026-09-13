@@ -2,10 +2,11 @@
   "name": "attempt2026-reversiblefunctiongraph",
   "version": "1.0.0",
   "description": "",
-  "main": "pile.ts",
+  "main": "serve.ts",
   "scripts": {
-    "start": "npx tsx pile.ts",
+    "start": "npx tsx serve.ts",
     "build": "npx tsc",
+    "rfg": "npx tsx rfg.ts",
     "snapshot": "./runAll.sh",
     "produce": "./run.sh"
   },

@@ -11,5 +11,5 @@
     "allowImportingTsExtensions": false,
     "verbatimModuleSyntax": true
   },
-  "include": ["*.ts", "scenarios/*.ts"]
+  "include": ["*.ts", "scenarios/*.ts", "producers/*.ts"]
 }

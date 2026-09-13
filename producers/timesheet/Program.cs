@@ -1,8 +1,7 @@
 // Program.cs — an ordinary C# program that happens to log to atoms.
 //
 //   dotnet run --project producers/timesheet
-//   dotnet run --project producers/timesheet | curl -X POST --data-binary @- localhost:8000/atoms
-//   dotnet run --project producers/timesheet -- http://localhost:8000/atoms
+//   dotnet run --project producers/timesheet | ./merge.sh pile.atoms
 //
 // Nothing here is built around RFG. There is a record, a rate card, a bit of
 // arithmetic and an interface — the code you would write anyway — and the only

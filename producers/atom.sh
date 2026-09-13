@@ -4,7 +4,7 @@
 #   ./producers/atom.sh length cat 3
 #   ["length","cat","3"]
 #
-#   ./producers/atom.sh hasLetter cat z false | curl -X POST --data-binary @- localhost:8000/atoms
+#   ./producers/atom.sh hasLetter cat z false | ./merge.sh pile.atoms
 #
 # The function, then its arguments, then the answer. Everything between the first
 # and the last is an argument, so this takes any arity without being told.

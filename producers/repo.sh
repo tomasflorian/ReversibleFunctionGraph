@@ -2,7 +2,7 @@
 # repo.sh — a producer, in bash, written by hand.
 #
 #   ./producers/repo.sh                                       # look at them
-#   ./producers/repo.sh | curl -X POST --data-binary @- localhost:8000/atoms
+#   ./producers/repo.sh | ./merge.sh pile.atoms
 #
 # It prints atoms to stdout and stops. That is the whole of a producer: there is
 # no library to link against, no kernel to run, nothing to import, and it never

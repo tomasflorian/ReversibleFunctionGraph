@@ -1,7 +1,7 @@
 // viewer.ts — the viewer's behaviour. graph.html is the markup and the styles;
 // this is everything that happens.
 //
-// ATOMS COME FROM TWO PLACES. The pile, over a live stream, and a paste box.
+// ATOMS COME FROM TWO PLACES. A pile file through its read-only adapter, and a paste box.
 // Which of them is in play is a switch on the left, and the switch is the only
 // thing kept between visits — atoms are never stored in the browser. Pasted
 // atoms live as long as the tab does.
@@ -39,13 +39,69 @@ const SHAPES: Record<Role, string> =
 const DIM = "#2a2a2a", DIM_FONT = "#555", DIM_EDGE = "#333", HOT_EDGE = "#fff";
 
 // ---------------------------------------------------------------------------
+// shortening — THE PICTURE ONLY
+//
+// A value is never shortened anywhere it means anything: the detail pane, the
+// triples, the walk table and the atoms all carry the whole string, and node
+// identity is still the exact text. This changes what is painted inside one box
+// on a canvas and nothing else. Clicking a shortened box selects the same node,
+// walks the same walk, and shows the whole value on the right.
+//
+// A plain ellipsis would be worse than the long label: two documents that share
+// an opening and an ending would draw as the same box, and the picture would be
+// asserting a collision that is not there. So the cut middle is replaced by a
+// hash OF THE PART THAT WAS CUT — different middles, different boxes.
+//
+//   "PasswordRecord:61\n    Username:ssh-…" -> "PasswordRecord:61\n  …...49fa1...ance.\n"
+//
+// It is not a handle. Nothing can be looked up by it, nothing stores it, and it
+// changes if the value changes — which is the point: it is a way of SEEING that
+// two boxes differ, not a name for either of them.
+
+// ON unless it has been switched off. A pile with documents in it draws as
+// unreadable slabs otherwise, and the whole value is a click away in the detail
+// pane — so the default is the one that shows you the shape of the graph.
+const SHORTEN_KEY = "rfg.shorten";
+let shorten = ((): boolean => {
+  try { return localStorage.getItem(SHORTEN_KEY) !== "0"; }
+  catch { return true; }   // blocked storage: still the default, not the opposite
+})();
+
+const MAX_LABEL = 100;
+const GAP = "...", HASH_CHARS = 5;
+
+// FNV-1a, 32 bit. Non-cryptographic on purpose: this has to run on every node on
+// every repaint, and all it has to do is differ when the middles differ.
+function fnv1a(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0").slice(-HASH_CHARS);
+}
+
+function shortLabel(text: string): string {
+  if (text.length <= MAX_LABEL) return text;
+  const keep = MAX_LABEL - (GAP.length * 2 + HASH_CHARS);
+  const head = Math.ceil(keep / 2), tail = keep - head;
+  const middle = text.slice(head, text.length - tail);
+  return text.slice(0, head) + GAP + fnv1a(middle) + GAP + text.slice(text.length - tail);
+}
+
+// Function names are short and are the one label worth reading whole, so they
+// are left alone. Values and calls are the ones that can be a page of text.
+const drawLabel = (n: ViewNode): string =>
+  shorten && n.role !== "function" ? shortLabel(n.label) : n.label;
+
+// ---------------------------------------------------------------------------
 // where atoms come from
 
 const serverAtoms: EXPAND.Atom[] = [];
 let pastedAtoms: EXPAND.Atom[] = [];
 
 // The preference is remembered. The atoms are not — this is a window onto a
-// pile, not a copy of one.
+// file, not another store.
 const SOURCE_KEY = "rfg.source";
 let source: Source = read();
 
@@ -150,7 +206,7 @@ function paint(whole: boolean): void {
   const have = new Set<string>(whole ? [] : nodes.getIds());
   const haveE = new Set<string>(whole ? [] : edges.getIds());
   nodes.add(data.nodes.filter(n => !have.has(n.id)).map(n => ({
-    id: n.id, label: n.label, color: base.get(n.id), shape: SHAPES[n.role],
+    id: n.id, label: drawLabel(n), color: base.get(n.id), shape: SHAPES[n.role],
   })));
   edges.add(data.edges
     .map(e => ({ id: e.from + " " + e.to + " " + e.slot, from: e.from, to: e.to, slot: e.slot }))
@@ -284,7 +340,46 @@ function renderTriples(id: string | null): string {
 
 let wTree: WALK.Column | null = null;
 let wPick: { header: string; value: string } | null = null;
-let wQual = true;
+// Off by default. A qualifier spells out the whole walk that produced a cell and
+// grows with depth, which is what you want when a row surprises you and noise
+// the rest of the time.
+let wQual = false;
+
+// QUICK FILTER — the anchor column only, contains, case-insensitive.
+//
+// It drops rows, and everything downstream reads what is left: the row count,
+// and the step menu. That is deliberate — filter to Ridgeway and "where can this
+// column go" should answer for the Ridgeway rows, not for the ones you just put
+// out of sight.
+//
+// It filters on the value, never on what is drawn. A stubbed column still
+// matches on its whole text, and a qualifier is not searched.
+let wFilter = "";
+
+// COLUMNS YOU STEP OVER RATHER THAN READ.
+//
+// Anchoring on a field and walking out to another one goes through the record,
+// and the record's name is a prerequisite rather than something you came to
+// read. Hiding shortens that column to a stub.
+//
+// Every column arrives in full — a column cannot be known to be a waypoint until
+// you have seen what is in it — and hiding is something done afterwards.
+//
+// PURELY DISPLAY, in the same category as a colour. Nothing is asserted by a
+// stub: two cells reading `4f1` are not claiming to be the same node any more
+// than two nodes sharing a colour are, and the full value is one click away in
+// the line under the table. Nothing else moves — the cell still carries its
+// whole value in data-walk-val, so clicking it offers the same steps, and the
+// column still counts for row splitting exactly as before.
+//
+// Qualifiers elsewhere are left alone on purpose: a hidden column's value still
+// shows in full inside the qualifiers of the columns hanging off it.
+//
+// `stub` is the whole of the display choice and is meant to be swapped — three
+// characters of a hash today; "", a tiny font, or half the string are all as
+// valid, and none of them mean anything.
+const wHidden = new Set<string>();
+const stub = (value: string): string => fnv1a(value).slice(-3);
 
 function renderWalk(): string {
   if (!wTree) {
@@ -299,16 +394,33 @@ function renderWalk(): string {
 
   const t = WALK.tabulate(wIndex, wTree, { maxRows: 2000 });
   const tree = wTree;
+  const all = t.rows;
+  const needle = wFilter.trim().toLowerCase();
+  if (needle) {
+    const first = t.columns[0];
+    t.rows = all.filter(r => (r[first]?.value ?? "").toLowerCase().includes(needle));
+  }
+
   let h = `<div class="head"><b>${esc(tree.header)}</b>` +
     ` <button class="morebtn" data-walk-reset="1">change anchor</button>` +
-    ` <button class="morebtn" data-walk-qual="1">qualifiers: ${wQual ? "on" : "off"}</button></div>`;
-  h += `<h3>${t.rows.length} row(s), ${t.columns.length} column(s)` +
+    ` <button class="morebtn" data-walk-qual="1">qualifiers: ${wQual ? "on" : "off"}</button>` +
+    ` <input id="wfilter" spellcheck="false" placeholder="filter ${esc(t.columns[0])}"` +
+    ` value="${esc(wFilter)}"` +
+    ` style="background:#111;color:#ddd;border:1px solid #333;border-radius:6px;` +
+    `padding:6px 10px;font:13px sans-serif;min-width:160px">` +
+    (needle ? ` <span style="cursor:pointer;color:#888" title="clear" data-walk-unfilter="1">&times;</span>` : ``) +
+    `</div>`;
+  h += `<h3>${t.rows.length}` + (needle ? ` of ${all.length}` : ``) + ` row(s), ` +
+       `${t.columns.length} column(s)` +
        (t.capped ? ` — <b>capped at 2000</b>, untick a column` : ``) +
        ` · click a cell to see where it can go</h3>`;
 
   h += `<div class="tablewrap"><table><thead><tr>` + t.columns.map(c =>
-    `<th>${esc(c)}` + (c === tree.header ? `` :
-      ` <span style="cursor:pointer;color:#888" data-walk-drop="${esc(c)}">&times;</span>`) +
+    `<th>${esc(c)}` +
+    ` <span style="cursor:pointer;color:#888" title="${wHidden.has(c) ? "show in full" : "shorten to a stub"}"` +
+    ` data-walk-hide="${esc(c)}">${wHidden.has(c) ? "+" : "&minus;"}</span>` +
+    (c === tree.header ? `` :
+      ` <span style="cursor:pointer;color:#888" title="drop this column" data-walk-drop="${esc(c)}">&times;</span>`) +
     `</th>`).join("") + `</tr></thead><tbody>`;
 
   for (const r of t.rows) {
@@ -316,7 +428,8 @@ function renderWalk(): string {
       const cell = r[c];
       // "?" is a step that found nothing. The row survives.
       if (!cell) return `<td>?</td>`;
-      const shown = wQual ? WALK.qualified(cell) : cell.value;
+      const shown = wHidden.has(c) ? stub(cell.value)
+                  : wQual ? WALK.qualified(cell) : cell.value;
       const hot = wPick && wPick.header === c && wPick.value === cell.value;
       return `<td style="cursor:pointer${hot ? ";color:#fff;background:#333" : ""}" ` +
              `data-walk-cell="${esc(c)}" data-walk-val="${esc(cell.value)}">${esc(shown)}</td>`;
@@ -325,17 +438,59 @@ function renderWalk(): string {
   h += `</tbody></table></div>`;
 
   if (wPick) {
-    // offered from calls that exist, so a step that finds nothing is never on
-    // the menu.
+    // CLICKING A CELL IS CLICKING A COLUMN. The menu is what the whole column
+    // can reach, not what this one cell happens to reach — otherwise a route
+    // that is dead for the row you clicked and alive for ten others never gets
+    // offered at all. Still computed from calls that exist, so nothing on the
+    // menu finds nothing everywhere; the count says how much of the column goes
+    // there, and the rest will write `?`.
     const pick = wPick;
-    const steps = WALK.stepsFrom(wIndex, pick.value);
-    h += `<div class="head">from ${esc(pick.value)}</div>`;
+    const values = t.rows.map(r => r[pick.header]?.value).filter((v): v is string => v !== undefined);
+    const steps = WALK.stepsFromMany(wIndex, values);
+
+    // BOTH READINGS AT ONCE. The menu is the column's — that is the useful one,
+    // since a route dead for the row you clicked and alive for ten others still
+    // wants offering. The colour is the cell's: `here` is a step the value in
+    // front of you can actually take, `there` is one the column can take and
+    // this row cannot, so ticking it writes `?` on your row and fills others.
+    // Both remain tickable; the colour tells you which you are choosing.
+    const hereSteps = new Set(WALK.stepsFrom(wIndex, pick.value).map(WALK.stepName));
+    const lot = (yes: boolean): string => (yes ? "here" : "there");
+
+    // One list per depth, all built the same way. Adding a fourth is adding a
+    // number to the array — the only thing that grows is the wait.
+    const hops = (depth: number, label: string): string => {
+      const paths = WALK.pathsFrom(wIndex, values, depth);
+      const here = new Set(
+        WALK.pathsFrom(wIndex, [pick.value], depth).map(p => WALK.pathName(p.steps)),
+      );
+      let out = `<div class="head">${label} <span class="hint">the middle ` +
+        `arrives stubbed · nothing is filtered, including routes that come back</span></div>`;
+      return out + (paths.length
+        ? `<div class="row">` + paths.map(({ steps: route, have, of }) =>
+            `<button class="morebtn ${lot(here.has(WALK.pathName(route)))}" data-walk-addpath="1"` +
+            ` data-walk-parent="${esc(pick.header)}"` +
+            ` data-route="${esc(JSON.stringify(route))}"` +
+            `>${esc(WALK.pathName(route))} <span style="color:#888">${have}/${of}</span></button>`
+          ).join(" ") + `</div>`
+        : `<div class="hint">nothing is ${depth} steps away from this column.</div>`);
+    };
+    h += `<div class="head">from <b>${esc(pick.header)}</b>` +
+         ` <span class="hint">${new Set(values).size} value(s) in the column` +
+         ` · you clicked ${esc(wHidden.has(pick.header) ? stub(pick.value) : pick.value)}` +
+         ` · <span style="color:#fff;border-bottom:2px solid #2b6cb0">goes somewhere from this cell</span>` +
+         ` · <span style="color:#777">only from other rows</span></span></div>`;
     h += steps.length
-      ? `<div class="row">` + steps.map(st =>
-          `<button class="morebtn" data-walk-add="${esc(WALK.stepName(st))}"` +
-          ` data-walk-parent="${esc(pick.header)}">${esc(WALK.stepName(st))}</button>`
+      ? `<div class="row">` + steps.map(({ step: st, have, of }) =>
+          `<button class="morebtn ${lot(hereSteps.has(WALK.stepName(st)))}"` +
+          ` data-walk-add="${esc(WALK.stepName(st))}"` +
+          ` data-walk-parent="${esc(pick.header)}">${esc(WALK.stepName(st))}` +
+          ` <span style="color:#888">${have}/${of}</span></button>`
         ).join(" ") + `</div>`
-      : `<div class="hint">nothing goes anywhere from here.</div>`;
+      : `<div class="hint">nothing goes anywhere from this column.</div>`;
+
+    h += hops(2, "two steps");
+    h += hops(3, "three steps");
   }
   return h;
 }
@@ -359,10 +514,29 @@ viewEl.addEventListener("click", e => {
   // is never touched by any of this.
   const wAnchor = near(e, "[data-anchor]");
   if (wAnchor) { wTree = WALK.newTree(attr(wAnchor, "anchor")); wPick = null; renderRight(); return; }
-  if (near(e, "[data-walk-reset]")) { wTree = null; wPick = null; renderRight(); return; }
+  if (near(e, "[data-walk-reset]")) {
+    wTree = null; wPick = null; wHidden.clear(); wFilter = "";
+    renderRight(); return;
+  }
+  if (near(e, "[data-walk-unfilter]")) { wFilter = ""; wPick = null; renderRight(); return; }
+  const wHide = near(e, "[data-walk-hide]");
+  if (wHide) {
+    const c = attr(wHide, "walkHide");
+    wHidden.has(c) ? wHidden.delete(c) : wHidden.add(c);
+    renderRight(); return;
+  }
   if (near(e, "[data-walk-qual]")) { wQual = !wQual; renderRight(); return; }
   const wDrop = near(e, "[data-walk-drop]");
-  if (wDrop && wTree) { WALK.removeNode(wTree, attr(wDrop, "walkDrop")); wPick = null; renderRight(); return; }
+  if (wDrop && wTree) {
+    const c = attr(wDrop, "walkDrop");
+    WALK.removeNode(wTree, c);
+    // A dropped column takes its hidden flag with it — and so do the columns
+    // that hung off it, which went with it. Asking the tree what survived beats
+    // guessing from the shape of a header.
+    const left = new Set(WALK.columns(wTree));
+    for (const h of [...wHidden]) if (!left.has(h)) wHidden.delete(h);
+    wPick = null; renderRight(); return;
+  }
   const wAdd = near(e, "[data-walk-add]");
   if (wAdd && wTree) {
     const nm = attr(wAdd, "walkAdd");
@@ -371,6 +545,23 @@ viewEl.addEventListener("click", e => {
     WALK.addStep(wTree, attr(wAdd, "walkParent"), { dir, fn });
     wPick = null; renderRight(); return;
   }
+  const wPath = near(e, "[data-walk-addpath]");
+  if (wPath && wTree) {
+    let parent: string | null = attr(wPath, "walkParent");
+    const route = JSON.parse(attr(wPath, "route")) as WALK.Step[];
+    route.forEach((st, k) => {
+      if (parent === null) return;
+      const header: string | null = WALK.childHeader(wTree!, parent, st);
+      if (header === null) { parent = null; return; }
+      // addStep returns null when the column is already there — and a column you
+      // put on the table yourself is not one to go stubbing behind your back.
+      // Only the middle of a route is stubbed; the far end is what you came for.
+      if (WALK.addStep(wTree!, parent, st) && k < route.length - 1) wHidden.add(header);
+      parent = header;
+    });
+    wPick = null; renderRight(); return;
+  }
+
   const wCell = near(e, "[data-walk-cell]");
   if (wCell) {
     const header = attr(wCell, "walkCell"), value = attr(wCell, "walkVal");
@@ -381,6 +572,19 @@ viewEl.addEventListener("click", e => {
 
   const chipEl = near(e, "[data-id]");
   if (chipEl) selectNode(attr(chipEl, "id"));
+});
+
+// Typing rebuilds the pane, which replaces the input the keystroke came from, so
+// the caret has to be put back on the new one.
+viewEl.addEventListener("input", e => {
+  const box = e.target as HTMLInputElement | null;
+  if (!box || box.id !== "wfilter") return;
+  const caret = box.selectionStart ?? box.value.length;
+  wFilter = box.value;
+  wPick = null;                       // the menu answers for the rows on screen
+  renderRight();
+  const again = document.getElementById("wfilter") as HTMLInputElement | null;
+  if (again) { again.focus(); again.setSelectionRange(caret, caret); }
 });
 
 // tab switching. The graph is built the first time it is asked for and never
@@ -406,6 +610,15 @@ el("multi").addEventListener("click", () => {
   el("multi").textContent = "multi-select: " + (multi ? "on" : "off");
   if (!multi && seeds.size > 1) clearSelection();
 });
+
+el("shorten").addEventListener("change", () => {
+  shorten = (el("shorten") as HTMLInputElement).checked;
+  try { localStorage.setItem(SHORTEN_KEY, shorten ? "1" : "0"); } catch { /* blocked storage */ }
+  // Labels only. Nothing is re-derived and no node is added or removed, so the
+  // layout does not move and the selection stands.
+  if (network) nodes.update(data.nodes.map(n => ({ id: n.id, label: drawLabel(n) })));
+});
+(el("shorten") as HTMLInputElement).checked = shorten;
 
 // ---- sources ----
 
@@ -459,7 +672,7 @@ el("clearpaste").addEventListener("click", () => {
   derive();
 });
 
-// ---- the pile ----
+// ---- the read-only file stream ----
 //
 // Atoms are collected whichever source is selected, so switching to the pile is
 // instant and does not need a reconnection. Only what is in play is expanded.

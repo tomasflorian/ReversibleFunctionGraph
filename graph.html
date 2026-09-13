@@ -2,15 +2,14 @@
 <!--
   graph.html — the page. Markup and styles only; the behaviour is viewer.ts.
 
-  THE PAGE BUILDS THE GRAPH ITSELF. It subscribes to the pile, receives atoms —
-  one call per line, the acts as they happened — and runs `expand` over them.
-  Nothing sends it a graph, and the derivation happens in front of you: atoms
-  arriving while a producer runs are expanded on their own and added, because
-  `expand` never consults the graph built so far. See expand.ts, pile.ts and the
+  THE PAGE BUILDS THE GRAPH ITSELF. It reads the pile through a read-only
+  adapter, receives one atom per line, and runs `expand` over them. Nothing
+  sends it a graph. Atoms are expanded independently because
+  `expand` never consults the graph built so far. See expand.ts, serve.ts and the
   README.
 
-  Served by pile.ts. `npm run build` once, `npm start`, then
-  http://localhost:8000.
+  Served by the optional read-only serve.ts adapter. `npm run build` once,
+  `npm start`, then http://localhost:8000.
 
   Two tabs, two questions. `triples` asks what a node is, from the graph's own
   side. `walk` builds a table by walking outward from an anchor — see walk.ts and
@@ -96,8 +95,19 @@
     .morebtn { margin-top: 12px; background: #2a2a2a; color: #ddd; border: 1px solid #555;
                padding: 7px 12px; border-radius: 6px; cursor: pointer; font: 13px sans-serif; }
     .morebtn:hover { border-color: #dd6b20; color: #fff; }
+    /* A step on the walk menu is offered for the whole column. These say whether
+       the cell you actually clicked can take it: `here` goes somewhere from the
+       value in front of you, `there` goes somewhere for other rows and will
+       write `?` on yours. Colour only — both are equally tickable. */
+    .morebtn.here  { border-color: #2b6cb0; color: #fff; }
+    .morebtn.there { border-color: #3a3a3a; color: #777; background: #202020; }
     table { border-collapse: collapse; font-size: 12px; }
-    th, td { border: 1px solid #2c2c2c; padding: 4px 8px; text-align: left; white-space: nowrap; }
+    th, td { border: 1px solid #2c2c2c; padding: 4px 8px; text-align: left; }
+    th { white-space: nowrap; }
+    /* A value may be a page of text. Newlines in it are content, so they are
+       shown; nothing is abbreviated and nothing is hidden behind a scroller.
+       vertical-align keeps short cells level with the tall one beside them. */
+    td { white-space: pre-wrap; vertical-align: top; }
     thead th { position: sticky; top: 0; background: #1a1a1a; color: #999;
                font-weight: normal; z-index: 1; }
     th.rowh { position: sticky; left: 0; background: #1a1a1a; z-index: 1; }
@@ -147,6 +157,9 @@
       <div id="net" style="display:none"></div>
       <div id="netbar" style="display:none">
         <button class="morebtn" id="multi">multi-select: off</button>
+        <!-- Drawing only. The whole value is still the node, still in the detail
+             pane, still in the table. See viewer.ts, "shortening". -->
+        <label class="hint" style="margin-right:8px"><input type="checkbox" id="shorten" checked> shorten labels</label>
         <span class="hint">arrows pan · <code>]</code> zoom in · <code>[</code> zoom out ·
           <span class="dot" style="background:#2b6cb0"></span>value
           <span class="dot" style="background:#805ad5"></span>function

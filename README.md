@@ -109,36 +109,91 @@ Not client and server. Three jobs, touching one plain file:
 
 ```
 producers  ->  the pile  ->  readers
+                  |  ^
+                  v  |
+                 cutters
 ```
 
 A **producer** writes atoms. Anything that can print lines of text qualifies —
 any language, or a person typing observations by hand. Its insides can be as
 complicated as you like: millions of lines, internal state, whatever the work
-takes. What leaves it is atoms. **A producer never reads the pile**, never
-coordinates with another producer, and never has to dedupe — merging is
-idempotent, so emitting the same atom a thousand times is free.
+takes. What leaves it is atoms. A producer never coordinates with another
+producer and never has to dedupe — merging is idempotent, so emitting the same
+atom a thousand times is free.
 
-The **pile** is the concatenation of what the producers wrote. It has no
+Producers come in two kinds, and **the pile cannot tell them apart**:
+
+- **Intake.** Reads the world — a file, an export, a program's own work as it
+  happens. This is the only part of the system that can lose something, because
+  what it does not write down is nowhere. Its job is to lose nothing, not to
+  understand anything. `ingest.ts` is the smallest one there is: a whole document
+  in, one atom out, nothing looked at.
+- **Cutters.** Read the pile and write more atoms back into it. A cutter is a
+  reader and a producer at once, and that is the only place those two jobs meet.
+  Parsing something deeper is then a call you have not made yet rather than a
+  chance you missed: `producers/passwordrecord-cut` cuts records out of a
+  document already in the pile, `producers/scan.ts` reads the addresses and URLs
+  out of a notes field that intake left whole, `producers/entropy.ts` scores
+  every word it finds.
+
+  `./rfg run` runs every one of them until a round adds nothing. There is no
+  order and no pass count: a cutter that only finds something once another has
+  run will find it on a later round, and any order lands in the same place —
+  which two rules are what buy:
+
+  - **Pure**, so the loop terminates. A cutter that writes a timestamp or a
+    random id emits atoms nobody has held before on every round, so no round is
+    ever empty and `./rfg run` never stops.
+  - **Monotone**, so it lands in one place. A bigger pile may only ever get you
+    more, never less. Purity is not enough on its own: the loop never runs a
+    cutter twice on the same pile, it runs it on one growing underneath it.
+
+  The way to hold the second one is **never look at what is missing.** A cutter
+  writing `["kind",x,"unknown"]` unless something better is already tagged is
+  pure and still wrong — run it early and that atom goes in, run it late and it
+  never does, and atoms are never retracted. The graph would start depending on
+  the order the cutters ran in, which is exactly what this design paid for and
+  got. Skipping work already done is fine: the atom it would have written is
+  already there, so the output is unchanged. Letting an absence change the answer
+  is not.
+
+Which of the two a producer is comes from what it reads, so nobody has to
+declare it and nothing enforces it. **Merging** is the third job and belongs to
+neither: it is a set union over lines, and `merge.sh` is all of it.
+
+So the rule is narrower than "a producer never reads the pile", which is what
+this said before and was stronger than it needed to be:
+
+> A producer may read the pile to decide **what to call**.
+> It must never read the pile to decide **what the answer is**.
+
+`parseNotes(thatDocument)` has to give the same answer to anyone holding that
+value, whether their pile has eight records or eight million. Otherwise two
+people write the same call with two answers and the picture shows a fork where
+nobody disagreed.
+
+What the old rule was bought for — no coordination, no dedupe, merging is a union
+— comes from `expand` reading only the atom and from merge being a union. None of
+it ever depended on where a producer got its input.
+
+The **pile** is an inert file containing the union of what producers wrote. It has no
 vocabulary — it never runs a function and may not even have the function — so it
-cannot check that an answer is *right*, only that it does not contradict one it
-already holds. It can be a running service, a folder, or `cat a.txt b.txt`.
+cannot check that an answer is *right* or detect a contradiction. `pile.atoms`
+is the conventional file; `cat a.atoms b.atoms |
+sort -u` is the whole merge operation.
 
 A **reader** expands the pile and draws or walks it. Everyone holding the same
 atoms holds the same graph, so the graph itself never has to travel.
 
-`pile.js` is the middle one, running:
+`serve.ts` is an optional read-only adapter around that file:
 
 ```
-POST   /atoms   producers append. Body is atom lines, exactly as the file holds them
 GET    /atoms   text/event-stream — replays the whole pile, then streams arrivals
-DELETE /atoms   empty it. An operator action, never a producer's
 ```
 
-It drops a line it already holds, byte for byte, so a producer re-sending its
-whole output is free. That is housekeeping, not meaning: it is textual, so two
-atoms with the same call and *different* answers are both kept — nothing there is
-entitled to pick a winner. And it keeps arrival order, because order carries no
-meaning and there is nothing to sort.
+It watches `pile.atoms` and reloads connected viewers after atomic file changes.
+It cannot ingest, merge, delete, or otherwise own the pile. `merge.sh` performs
+the byte-for-byte union locally.
 
 ## Expanding
 
@@ -287,51 +342,104 @@ Ten views of one idea, not ten separate ideas.
 The findings above are the engine's half. This is your half: if the engine gives
 you no shape, you supply all of it. Each could have gone another way.
 
-- **O1 — a list is text with `|` between the parts.** Not arrays, not numbered
-  slots, not handles.
-- **O2 — one thing becomes many in two steps.** First cut the whole into one list
-  (one call, one answer). Then take the parts out of the list one at a time, by
-  what they say. `sequence` in `shapes.ts` does both.
-- **O3 — give positions names, don't number them.** `record` names a fixed known
+- **O1 — a collection is not a thing. Membership is a call.** Asking whether
+  something is in a piece of text is one call, and that call is all there is:
+
+  ```
+  ["word","paris is a city","paris","paris"]
+  ```
+
+  A function handing back one of its own arguments, the same shape as `isIP` and
+  `hasFormat`. The selector declines a non-member, so one function also answers
+  "is this in here?" for free, and `rev_word()` goes back to the sentence and
+  forward again to its other words.
+
+  **There used to be a list.** The text was cut into a `|`-joined string, that
+  string was minted as a node, and the parts were taken back out of *it* — two
+  calls and an extra node between a sentence and its word. It was deleted, and
+  the measurement is why:
+
+  ```
+  37 minted lists in the corpus
+  36 touched by nothing but their own extractor
+   0 produced by more than one cutter
+   1 a one-element cut, whose list IS its only element
+  ```
+
+  A node nothing else lands on is not a meeting point — it is a node that exists
+  to keep track of something, which O3 says not to have. It also put two hops
+  between a sentence and its words, which the walk pays for on every route and
+  the two- and three-step menus pay for again by enumerating the junk hop.
+
+  Removing it took the corpus from 420 atoms and 709 nodes to 383 and 624, and
+  changed nothing anyone could ask.
+
+  **This does not touch the lists the world hands you.** `bob|2026-08-25|projX|8|1`
+  arrives as a value with five functions on it, and stays a node, because nobody
+  minted it. Seven of them are still in the corpus.
+- **O2 — give positions names, don't number them.** `record` names a fixed known
   set of slots, so `lastOctet` is fine. Making up `0, 1, 2…` for a count you
   don't know in advance is the thing to avoid.
-- **O4 — no nodes that exist only for the machinery.** A node that exists only to
+
+
+- **O3 — no nodes that exist only for the machinery.** A node that exists only to
   keep track of something means something outside the data is being represented
-  inside it.
-- **O5 — two ways in: by name, or by content.** When a container names its parts,
-  the name becomes a function name. When nothing names them, cut to a list and
-  take them out by content. Records go the first way, collections the second.
-- **O6 — a format is its cutting functions.** Grouping one format's cutters under
+  inside it. This is the one that killed the list.
+- **O4 — two ways in: by name, or by content.** When a container names its parts,
+  the name becomes a function name. When nothing names them, ask about the parts
+  by content. Records go the first way, collections the second — and neither way
+  makes a node for the container.
+- **O5 — a format is its cutting functions.** Grouping one format's cutters under
   a function named after the format is good. What is not allowed is one format's
   function being shaped differently from another's — turning one format into
   another to reuse a path, or checking which format you have to decide what to
   *do* rather than which cutter to use.
 
-O2 and O3 were made real by deleting something: there is no `chop`. Counting the
-pieces of a cut was the one way these opinions rule out, so the method was
-removed rather than left as a temptation.
+O1 and O2 were each made real by deleting something. There is no `chop` —
+counting the pieces of a cut is the one thing these opinions rule out, so the
+method was removed rather than left as a temptation. And there is no list.
 
 ## Quick start
 
 ```sh
 npm install
-npm start     # the pile, at http://localhost:8000. Open it, leave it running
-./run.sh      # in another terminal: run the producer, send its atoms to the pile
+npm start     # optional viewer at :8000, watching pile.atoms
+./run.sh      # run the producer and merge its atoms into pile.atoms
 ./runAll.sh   # write snapshots/combined.atoms — the regression artifact
 ```
 
-Open the page first and then run the producer, and you watch the picture fill in
-as the atoms arrive. Run `./run.sh` again and nothing happens, which is the point
+`rfg.config.ts` lists what this pile is made of and gives each tool a short
+name. The only thing it says about a tool is whether it reads the pile, which is
+a fact about the program rather than a choice — and it is what makes a tool worth
+running again after something new lands:
+
+```sh
+./rfg list                                     # the inputs, the tools, which read the pile
+./rfg run                                      # bring the inputs in, catch up, stop
+./rfg run --fresh                              # the same, from an empty pile
+./rfg run ingest some/other.txt                # the inputs and this too
+./rfg run --only scan,entropy                  # catch up with some of them
+./rfg run --pile other.atoms                   # a different pile
+some-producer | ./rfg run                      # anything that prints atoms
+./rfg watch                                    # stay caught up
+```
+
+An explicit `-s` or `-u` replaces that side of the profile rather than adding
+to it. Commands are argv arrays in `rfg.config.ts`, so tools in any language can
+be registered without shell quoting tricks.
+
+Open the page and run the producer; the viewer reloads from the changed file.
+Run `./run.sh` again and nothing changes, which is the point
 — merging is idempotent, so re-sending everything is free.
 
 Anything that can print lines is a producer, and literally so. There are four
 here, and the pile cannot tell them apart:
 
 ```sh
-./producers/atom.sh notedBy paris tomas   | curl -X POST --data-binary @- localhost:8000/atoms
-./producers/repo.sh                       | curl -X POST --data-binary @- localhost:8000/atoms
-dotnet run --project producers/timesheet  | curl -X POST --data-binary @- localhost:8000/atoms
-./run.sh                                  # scenarios/combined.ts, which posts for itself
+./producers/atom.sh notedBy paris tomas   | ./merge.sh pile.atoms
+./producers/repo.sh                       | ./merge.sh pile.atoms
+dotnet run --project producers/timesheet  | ./merge.sh pile.atoms
+./run.sh                                  # scenarios/combined.ts, merged locally
 ```
 
 `atom.sh` takes a call as arguments and prints one line. `repo.sh` is bash,
@@ -406,26 +514,54 @@ straight through `tsx`. There is no build step.
 
 ## How you call things
 
-The thing you are calling the function *on* is always the first argument. That is
-what makes chaining work:
+The thing you are calling the function *on* is always the first argument. Not a
+rule the engine enforces — an atom's slot 1 is just an argument — but the
+convention that makes a walk work: `rev_fn()` goes back to the subject and to
+nothing else.
 
-```ts
-subject.apply("fn", ...rest)   ≡   fn(subject, ...rest)
+**There is no producer API, and there is no chaining.** A producer is a program
+that prints atom lines. It computes things the way any program does, and says
+what it did afterwards:
+
+```
+["upper","paris","PARIS"]
+["length","PARIS","5"]
 ```
 
-```ts
-const p = new Producer();
-p.def("upper",  s => s.toUpperCase());
-p.def("length", s => String(s.length));
+Those are two independent facts. Nothing in either atom records that one came
+from the other, and nothing needs to — a reader finds the join by following
+`PARIS`, which is the same node both times. **Chaining was only ever a
+convenience for whoever was writing, and it left no trace in what got written.**
 
-p.value("paris").apply("upper");            // ["upper","paris","PARIS"]
-p.value("paris").apply("upper").apply("length");   // chains through the answer
-p.write();
+There used to be a class with `def`, `value` and `apply` that ran your functions
+for you, threaded the answers, and memoised. It produced exactly the atoms the
+corpus produces now, and it was deleted. `scenarios/combined.ts` is a logger
+with one primitive:
+
+```ts
+log("length", "paris", "5");
 ```
 
-That is the whole producer API: `def`, `value`, `apply`, `write`. There is
-nothing here for asking questions, because a producer never reads. Walking is a
-reader's job — the viewer, or `walk-cli.js`.
+What that gave away for free is now written down where you can see it. A
+**function that declines writes nothing**, and that is an `if`:
+
+```ts
+for (const s of ["192.168.1.3", "fifskje"]) {
+  if (!isIPv4(s)) continue;          // no atom, for this call or the next
+  log("isValidIP", s, s);
+  log("lastOctet", s, lastOctet(s));
+}
+```
+
+`fifskje` leaves no trace at all, and the graph never learns the question was
+asked. Every other producer here already worked this way — `scan.ts` has a
+`continue`, the C# `Program.cs` has `if (v.Length > 0)`, the C# timesheet's
+`isWeekend` returns null for all three dates and contributes nothing.
+
+Composition across producers is not chaining either. `host` runs on what `urlIn`
+wrote, on a later round, **through the pile** — `./rfg run` re-runs every
+pile-reading tool until nothing is new. The place where work joins up is the
+file, not a call stack.
 
 ## The corpus
 
@@ -459,7 +595,7 @@ for two *different* things, one was renamed, marked `RENAMED`.
 This is where walking backwards gets checked by eye. If a shape really can be
 read back out, you can see it here without it having been stored.
 
-The page subscribes to the pile and expands the atoms itself. Nothing sends it a
+The page subscribes to the read-only file adapter and expands the atoms itself. Nothing sends it a
 graph, and no nodes-and-edges file exists anywhere.
 
 **Expansion is incremental, and needs no reconciliation.** `expand` reads only
@@ -565,29 +701,38 @@ git diff snapshots/  # did anything move?
 
 The snapshot is the regression artifact, and deterministic: atoms are written
 sorted, so a diff line means the atoms changed, not that a call moved. It is the
-same shape the pile holds, so `curl -X POST --data-binary @snapshots/combined.atoms
-localhost:8000/atoms` puts it back in front of you. Stdout is otherwise
+same shape the pile holds, so `cp snapshots/combined.atoms pile.atoms` puts it
+in front of the viewer. Stdout is otherwise
 discarded. The graph does not narrate; the picture is the report.
 
 ## Files
 
 ```
-producer.ts           runs functions, records atoms, sends or writes them
-shapes.ts             records, sequences, edit chains — all write-only
-scenarios/combined.ts a producer in TypeScript: every shape, in one
+rfg / rfg.ts          run tools, merge what they print, keep the pile caught up
+rfg.config.ts         a pile's inputs, its tools, and which of them read it
+scenarios/combined.ts a producer in TypeScript: every shape, in one — a logger
 producers/atom.sh     a producer: one call as arguments, one line out
 producers/repo.sh     a producer in bash, written by hand
 producers/timesheet/  a producer in C#: ordinary code, logging to atoms
-pile.js               the pile: takes atoms, streams them, serves the page
+producers/passwordrecord/      intake in C#: a file of records in, atoms out
+producers/passwordrecord-cut/  the same parse as a cutter: atoms in, atoms out
+producers/scan.ts     a cutter: reads what a Notes field was hiding
+producers/entropy.ts  a cutter: which strings look generated rather than written
+cut.sh                catch a pile up — ./rfg run --pile FILE, spelled short
+merge.sh              union stdin into an atom file
+serve.ts              optional read-only file watcher and viewer server
+ingest.ts             a document in, one atom out. Intake that reads nothing
 expand.js             atoms -> nodes and edges. The one expansion
 walk.js               atoms -> tables. Browser and node, same file
 viewer.ts             the viewer's behaviour
 graph.html            the page: markup and styles
 walk-cli.js           the walk tab without the tab
 snapshots/            the regression artifact
-run.sh                produce -> the pile
+run.sh                produce -> merge into pile.atoms
 runAll.sh             produce -> snapshots/combined.atoms
+check.sh              the refactor's own check: nothing lost, workings in check/
 log.md                things tried and set down again
+REFACTOR.md          the next one: there is no graph, only an index over atoms
 ```
 
 `pile.atoms` is what the pile holds and is not tracked. `log.md` carries no
@@ -653,15 +798,15 @@ is what a second producer was needed to make visible.
   and order-independence at the limit. What is left to check is splitting a file
   any number of ways, and many random orderings rather than the two that arise
   naturally.
-- **A graph server.** `pile.js` holds the pile and answers no questions —
+- **A graph server.** `serve.ts` only exposes the inert file to browsers —
   `expand` and `walk` are the reader's, and it never runs a function. A server
   that gets *asked things* is a different thing, and nothing is built across that
   line.
 - **A crawler that hunts containment** — noticing that `smith` sits inside
   `smith@example.com`. One ordinary function whose two arguments are drawn
-  from the graph's own values, applied by something that walks on its own.
-  Deliberately optional, opt-in, and named in the graph where it can be switched
-  off — one activity among many rather than the core one.
+  from the graph's own values, applied by something that walks on its own. One
+  cutter among many: deliberately optional, opt-in, and named in the graph where
+  it can be switched off rather than being the core activity.
 - **Weights on ticks.** Booleans today; wherever a schema is stored should not
   assume that.
 - **Time and ordering.** The one that touches the claim itself: it is what *Known

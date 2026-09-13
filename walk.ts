@@ -144,6 +144,107 @@ export function stepsFrom(index: Index, value: string): Step[] {
   return out;
 }
 
+// Every step available from a WHOLE COLUMN, with how many of its values offer
+// it. Clicking a cell is really clicking a column: what you want to know is
+// where this column can go, not where this one cell happens to go. A step that
+// only one value in the column offers is still worth being told about — it will
+// write `?` on every other row, and a row with a hole is more honest than a step
+// nobody was offered.
+//
+// `have` is out of how many distinct values in the column, so `4/13` reads as
+// "four of the thirteen go there".
+export function stepsFromMany(index: Index, values: string[]): { step: Step; have: number; of: number }[] {
+  const distinct = [...new Set(values)];
+  const count = new Map<string, { step: Step; have: number }>();
+  for (const v of distinct)
+    for (const st of stepsFrom(index, v)) {
+      const key = stepName(st);
+      const at = count.get(key);
+      if (at) at.have++;
+      else count.set(key, { step: st, have: 1 });
+    }
+  return [...count.values()]
+    .map(c => ({ ...c, of: distinct.length }))
+    .sort((a, b) => b.have - a.have
+      || a.step.fn.localeCompare(b.step.fn)
+      || a.step.dir.localeCompare(b.step.dir));
+}
+
+// SEVERAL HOPS AT ONCE.
+//
+// Walking to somewhere interesting often goes through values you have no wish to
+// read — a record's own name, on the way from one of its fields to another. This
+// offers the far end directly: every route of exactly `depth` steps out of a
+// column, named the way a column header is named, destination first.
+//
+//   host() via urlIn() via Notes()
+//
+// `have` counts the values in the column that reach the END of the route. A
+// value that gets halfway and stops has not found this path.
+//
+// Nothing is filtered. A route that goes out and comes back — Company() then
+// rev_Company() — is not a wasted trip: it lands on the OTHER records at the
+// same company, which is how you ask for everything else like this one.
+//
+// It walks a layer at a time and keeps ONE entry per route, merging the values
+// that route reaches. Recursing per value instead would re-walk the same route
+// once for every value that happens to take it.
+export function pathsFrom(
+  index: Index,
+  values: string[],
+  depth = 2,
+): { steps: Step[]; have: number; of: number }[] {
+  const distinct = [...new Set(values)];
+  const count = new Map<string, { steps: Step[]; have: number }>();
+
+  for (const v of distinct) {
+    let layer = new Map<string, { steps: Step[]; at: Set<string> }>([
+      ["", { steps: [], at: new Set([v]) }],
+    ]);
+
+    for (let d = 0; d < depth; d++) {
+      const next = new Map<string, { steps: Step[]; at: Set<string> }>();
+      for (const { steps, at } of layer.values())
+        for (const from of at)
+          for (const st of stepsFrom(index, from)) {
+            const landed = step(index, from, st.dir, st.fn);
+            if (!landed.length) continue;
+            const key = [...steps, st].map(stepName).join(" <- ");
+            const to = next.get(key) ?? { steps: [...steps, st], at: new Set<string>() };
+            for (const x of landed) to.at.add(x);
+            next.set(key, to);
+          }
+      layer = next;
+    }
+
+    // one vote per value per route, however many ways it got there
+    for (const { steps } of layer.values()) {
+      const key = pathName(steps);
+      const at = count.get(key);
+      if (at) at.have++;
+      else count.set(key, { steps, have: 1 });
+    }
+  }
+
+  return [...count.values()]
+    .map(c => ({ ...c, of: distinct.length }))
+    .sort((a, b) => b.have - a.have || pathName(a.steps).localeCompare(pathName(b.steps)));
+}
+
+// The header addStep WOULD give this child. Kept next to addStep so the naming
+// rule lives in one place: a caller adding several steps at once needs each
+// middle header to hang the next step off, whether or not it already existed.
+export function childHeader(tree: Column, parentHeader: string, s: Step): string | null {
+  const parent = findNode(tree, parentHeader);
+  if (!parent) return null;
+  return parent.step === null ? stepName(s) : stepName(s) + " via " + parent.header;
+}
+
+// destination first, the way a column header reads
+export function pathName(steps: Step[]): string {
+  return steps.slice().reverse().map(stepName).join(" via ");
+}
+
 // every function that produced something — the anchors you can start from
 export function anchorFunctions(index: Index): string[] {
   const seen = new Set<string>();
