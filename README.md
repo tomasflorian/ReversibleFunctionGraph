@@ -1,5 +1,8 @@
 # Reversible Function Graph
 
+> **Superseded by [StringWalk](https://github.com/tomasflorian/StringWalk).**
+> This repository is no longer developed. `POSTMORTEM.md` says why it ended.
+
 ## What this is
 
 You run a function. The call gets written down as one line:
