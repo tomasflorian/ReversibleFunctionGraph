@@ -2,13 +2,13 @@
 
 
 
-
+<br><br><br>
 
 > **Superseded by [StringWalk](https://github.com/tomasflorian/StringWalk).**
 > This repository is no longer developed. `POSTMORTEM.md` says why it ended.
 
 
-
+<br><br><br>
 
 
 ## What this is
